@@ -1,0 +1,55 @@
+{
+  "name": "40k-archetype-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Nachmund — Warhammer 40K (10th edition) tournament meta analysis. Faction archetype radars, build clusters, matchup explorer, and predictor.",
+  "author": "Jonathan Stewart",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test:data": ".venv/bin/pytest tests/",
+    "predeploy": "npm run test:data && npm run build",
+    "deploy": "gh-pages -d dist",
+    "extract-data": "node --env-file=.env scripts/dataExtractor.js",
+    "replay-db": "node --env-file=.env scripts/replayDbFromJson.js",
+    "db:migrate": "node --env-file=.env db/migrate.js",
+    "db:start": "docker compose up -d db",
+    "db:stop": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d db && sleep 3 && node --env-file=.env db/migrate.js",
+    "dbt:run": "cd dbt && ../.venv/bin/dbt --no-use-colors run --profiles-dir .",
+    "dbt:test": "cd dbt && ../.venv/bin/dbt --no-use-colors test --profiles-dir .",
+    "dbt:build": "cd dbt && ../.venv/bin/dbt --no-use-colors build --profiles-dir .",
+    "rating:fit": "scripts/run-rating.sh"
+  },
+  "dependencies": {
+    "katex": "^0.16.45",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-katex": "^3.1.0",
+    "react-router-dom": "^7.9.5",
+    "recharts": "^3.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.36.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.22",
+    "gh-pages": "^6.3.0",
+    "globals": "^16.4.0",
+    "postcss": "^8.5.6",
+    "postgres": "^3.4.5",
+    "tailwindcss": "^3.4.18",
+    "vite": "^7.1.7"
+  }
+}

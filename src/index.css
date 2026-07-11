@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Large external displays (Studio Display, Pro Display XDR, big iMacs,
+   most desktop monitors) at 1920+ CSS pixels make the dense Tailwind
+   default sizing feel cramped at typical viewing distance. CSS `zoom`
+   matches browser-zoom behavior — scales text + pixel-hardcoded widths
+   + SVG together, so layout stays intact. (Unlike rem-bumping the root
+   font-size, which only catches rem-based utilities and breaks anything
+   with inline pixel widths like the faction picker buttons.)
+
+   1920 px threshold deliberately keeps this OFF MacBook built-ins
+   (1512–1728 CSS px at default scaling) and iPads. */
+@media (min-width: 1920px) {
+  body {
+    zoom: 1.25;
+  }
+}

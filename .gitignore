@@ -1,0 +1,57 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Local env / secrets
+.env
+.env.example
+requirements.txt
+
+# Data pipeline + ingestion (kept local, not part of the published bundle)
+# Exception: /db/migrations/*.sql and /db/seeds/*.sql are tracked — they
+# rebuild the database from scratch and are version-worthy. Pipeline JS / Py
+# (auth, writers, extractors) stays local via the explicit excludes below.
+/data/
+/pipeline/
+/dbt/
+/db/*.js
+/db/*.py
+/scripts/
+/docker-compose.yml
+
+# Misc local-only artifacts
+.local-reference/
+
+# Source/working images (only the deployed compressed versions are committed)
+public/content*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
