@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Nachmund — Warhammer 40K (10th edition) tournament meta analysis. Faction archetype radars, build clusters, matchup explorer, and predictor." />
+    <!-- Don't leak the user's exact path to Google Fonts (or any cross-origin
+         asset). Origin-only is enough for fonts to resolve correctly. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <!-- Defense-in-depth Content Security Policy. The site is purely static
+         and bundles its own JS, so the only externals are Google Fonts (CSS +
+         font files), the GitHub Pages origin (self), and inline styles
+         emitted by the build. No connect-src to backends; data is fetched
+         via same-origin. The first attempt at this (a28c3a7) was rolled back
+         after a misdiagnosis — the actual prod break was the manualChunks
+         load-order bug (4c32adb), unrelated to CSP. -->
+    <!-- frame-ancestors omitted: browsers ignore it when delivered via meta
+         (it requires an HTTP header), and GitHub Pages can't set custom
+         headers. Logged a warning before removal. The X-Frame-Options
+         GitHub Pages defaults provide most of the same protection. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&display=swap" />
+    <title>Nachmund</title>
+    <script type="module" crossorigin src="/40k-archetype-viewer/assets/index-Bls-A8X4.js"></script>
+    <link rel="modulepreload" crossorigin href="/40k-archetype-viewer/assets/katex-B6-zOaUx.js">
+    <link rel="stylesheet" crossorigin href="/40k-archetype-viewer/assets/katex-BSDohvTu.css">
+    <link rel="stylesheet" crossorigin href="/40k-archetype-viewer/assets/index-CRSx3BEf.css">
+  </head>
+  <body>
+    <div id="root">
+      <!-- Static loading state. React replaces this once the bundle hydrates.
+           Users on slow connections see something coherent in the 1-3s
+           before the JS arrives, instead of a blank dark rectangle. -->
+      <div style="
+        position: fixed; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        color: #94a3b8; background-color: #0f172a;
+      ">
+        <div style="
+          font-family: 'Cinzel', serif;
+          font-size: 1.75rem; font-weight: 600;
+          color: #f1f5f9; letter-spacing: 0.02em;
+        ">Nachmund</div>
+        <div style="font-size: 0.875rem; margin-top: 0.5rem;">
+          Loading tournament data…
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
