@@ -970,11 +970,43 @@ const FactionView = () => {
                               )}
                               <div className="text-slate-400 text-[11px] mt-0.5">
                                 {ex.faction && <span className="text-slate-300">{displayFactionName(ex.faction)}</span>}
-                                {ex.detachment && <span> · <span className="text-purple-300">{ex.detachment}</span></span>}
+                                {/* All detachments the list fields (11e allows several);
+                                    fall back to the single legacy field. */}
+                                {(ex.detachments?.length
+                                  ? ex.detachments
+                                  : ex.detachment ? [{ name: ex.detachment }] : []
+                                ).map((d, di) => (
+                                  <span key={di}> · <span className="text-purple-300">
+                                    {d.name}
+                                    {d.dp != null && <span className="text-purple-500"> ({d.dp} DP)</span>}
+                                  </span></span>
+                                ))}
                                 {ex.games != null && (
                                   <span> · <span className="text-slate-300">{ex.wins}W/{ex.losses}L/{ex.draws}D over {ex.games} games</span></span>
                                 )}
                               </div>
+                              {/* Force disposition: what the player submitted, or — when the
+                                  list doesn't say — what their detachments grant access to. */}
+                              {ex.detachments?.length > 0 && (
+                                <div className="text-slate-400 text-[11px] mt-0.5">
+                                  <span className="text-slate-500">Force Disposition:</span>{' '}
+                                  {ex.forceDispositions?.length ? (
+                                    <span className="text-sky-300">{ex.forceDispositions.join(' · ')}</span>
+                                  ) : (() => {
+                                    const objectives = [...new Set(
+                                      ex.detachments.map((d) => d.objective).filter(Boolean)
+                                    )];
+                                    return objectives.length ? (
+                                      <span className="text-slate-400">
+                                        not listed — has access to{' '}
+                                        <span className="text-sky-400">{objectives.join(' · ')}</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-500 italic">not listed</span>
+                                    );
+                                  })()}
+                                </div>
+                              )}
                               {ex.title && ex.eventName && ex.title !== ex.eventName && (
                                 <div className="text-slate-500 text-[10px] mt-0.5 italic leading-relaxed">
                                   List title: "{ex.title}"
@@ -1079,6 +1111,39 @@ const FactionView = () => {
                                           <div className="text-purple-300 text-[11px] pl-3 mt-0.5">
                                             <span className="text-purple-500 font-semibold">Enhancement:</span> {u.enhancement}
                                           </div>
+                                        )}
+
+                                        {/* 11e attached characters (Leader / Support) render
+                                            inside their bodyguard's block — the joined unit
+                                            plays as one piece on the table. */}
+                                        {u.attachedUnits?.length > 0 && (
+                                          <ul className="ml-3 mt-1.5 pl-2 space-y-1.5 border-l-2 border-purple-800/50">
+                                            {u.attachedUnits.map((au, aIdx) => (
+                                              <li key={aIdx} className="text-[12px]">
+                                                <div className="flex justify-between items-baseline gap-2">
+                                                  <span className="text-slate-200 font-medium">
+                                                    {au.name}
+                                                    <span className="ml-2 text-[9px] bg-purple-700/40 text-purple-300 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                                      {au.attachedRole || 'Attached'}
+                                                    </span>
+                                                  </span>
+                                                  {au.points != null && (
+                                                    <span className="text-slate-400 font-mono shrink-0">{au.points} pts</span>
+                                                  )}
+                                                </div>
+                                                {au.wargear?.length > 0 && (
+                                                  <div className="text-slate-400 text-[11px] pl-3 mt-0.5 leading-relaxed">
+                                                    {au.wargear.join(' · ')}
+                                                  </div>
+                                                )}
+                                                {au.enhancement && (
+                                                  <div className="text-purple-300 text-[11px] pl-3 mt-0.5">
+                                                    <span className="text-purple-500 font-semibold">Enhancement:</span> {au.enhancement}
+                                                  </div>
+                                                )}
+                                              </li>
+                                            ))}
+                                          </ul>
                                         )}
                                       </li>
                                       );
