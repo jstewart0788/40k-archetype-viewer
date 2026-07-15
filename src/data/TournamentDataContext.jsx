@@ -33,6 +33,7 @@ export function TournamentDataProvider({ children }) {
       raw,
       factionRatings:        raw.factionRatings || {},
       factionBuilds:         raw.factionBuilds || {},
+      unassignedWinningLists: raw.unassignedWinningLists || {},
       archetypeMatchups:     raw.archetypeMatchups || {},
       buildMatchups:         raw.buildMatchups || {},
       buildVsBuildMatchups:  raw.buildVsBuildMatchups || {},

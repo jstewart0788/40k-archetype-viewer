@@ -140,8 +140,105 @@ function topPlaystyles(profile, n = 2) {
 
 const LAST_FACTION_KEY = 'nachmund.lastFaction';
 
+// A single off-meta winning list (a winning list that doesn't belong to any
+// shown build). Renders record + provenance + the parsed list, mirroring the
+// per-build example cards.
+function OffMetaListCard({ ex }) {
+  const [open, setOpen] = useState(false);
+  const wr = (ex.winRate ?? 0) * 100;
+  let wrCl = 'text-yellow-400';
+  if (wr >= 65) wrCl = 'text-emerald-400';
+  else if (wr >= 55) wrCl = 'text-green-400';
+  else if (wr < 45) wrCl = 'text-red-400';
+  const dets = ex.detachments?.length ? ex.detachments : (ex.detachment ? [{ name: ex.detachment }] : []);
+  return (
+    <div className="rounded-lg bg-slate-800/60 border border-slate-700 p-4">
+      <div className="flex justify-between items-start gap-2 mb-2 pb-2 border-b border-slate-700">
+        <div className="min-w-0">
+          <div className="text-white font-semibold truncate">{ex.eventName || ex.title || 'Tournament list'}</div>
+          <div className="text-slate-400 text-[11px] mt-0.5">
+            {ex.playerName && <span className="text-amber-300">{ex.playerName}</span>}
+            {ex.playerName && ex.eventDate && <span> · </span>}
+            {ex.eventDate && <span className="text-slate-500">{ex.eventDate}</span>}
+          </div>
+          <div className="text-slate-400 text-[11px] mt-0.5">
+            {dets.map((d, i) => (
+              <span key={i}>{i > 0 && ' · '}<span className="text-purple-300">{d.name}{d.dp != null && <span className="text-purple-500"> ({d.dp} DP)</span>}</span></span>
+            ))}
+          </div>
+          {ex.forceDispositions?.length > 0 && (
+            <div className="text-slate-400 text-[11px] mt-0.5">
+              <span className="text-slate-500">Force Disposition:</span>{' '}
+              <span className="text-sky-300">{ex.forceDispositions.join(' · ')}</span>
+            </div>
+          )}
+        </div>
+        <div className="text-right shrink-0">
+          <div className={`text-base font-bold ${wrCl}`}>{ex.record}</div>
+          <div className={`text-[11px] font-semibold ${wrCl}`}>{wr.toFixed(0)}% · {ex.games}g</div>
+          {ex.pointsTotal != null && <div className="text-emerald-300 font-mono text-xs mt-0.5">{ex.pointsTotal} pts</div>}
+        </div>
+      </div>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="text-xs font-medium text-purple-300 hover:text-purple-200 inline-flex items-center gap-1">
+        {open ? 'Hide list ▴' : 'Show list ▾'}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-3">
+          {(ex.sections || []).map((sec, sIdx) => (
+            <div key={sIdx}>
+              <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-1">{sec.name}</div>
+              <ul className="space-y-2">
+                {(sec.units || []).map((u, uIdx) => (
+                  <li key={uIdx} className="text-[12px]">
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-slate-200 font-medium">{u.name}</span>
+                      {u.points != null && <span className="text-slate-400 font-mono shrink-0">{u.points} pts</span>}
+                    </div>
+                    {u.modelRows?.length > 0 ? (
+                      <ul className="pl-3 mt-1 space-y-0.5">
+                        {u.modelRows.map((r, rIdx) => (
+                          <li key={rIdx} className="text-[11px] leading-relaxed">
+                            <span className="text-slate-300 font-medium">{r.count}× {r.name}</span>
+                            {r.wargear?.length > 0 && <span className="text-slate-400"> — {r.wargear.join(', ')}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : u.wargear?.length > 0 && (
+                      <div className="text-slate-400 text-[11px] pl-3 mt-0.5 leading-relaxed">{u.wargear.join(' · ')}</div>
+                    )}
+                    {u.enhancement && (
+                      <div className="text-purple-300 text-[11px] pl-3 mt-0.5">
+                        <span className="text-purple-500 font-semibold">Enhancement:</span> {u.enhancement}
+                      </div>
+                    )}
+                    {u.attachedUnits?.length > 0 && (
+                      <ul className="ml-3 mt-1.5 pl-2 space-y-1 border-l-2 border-purple-800/50">
+                        {u.attachedUnits.map((au, aIdx) => (
+                          <li key={aIdx} className="text-[12px]">
+                            <span className="text-slate-200 font-medium">{au.name}
+                              <span className="ml-2 text-[9px] bg-purple-700/40 text-purple-300 px-1.5 py-0.5 rounded uppercase tracking-wide">{au.attachedRole || 'Attached'}</span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {!(ex.sections || []).length && (
+            <div className="text-slate-500 italic text-[12px]">Couldn't parse this list's structure.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const FactionView = () => {
-  const { integratedFactionRatings: factionRatings, factionBuilds, dataMetadata } = useTournamentData();
+  const { integratedFactionRatings: factionRatings, factionBuilds, unassignedWinningLists, dataMetadata } = useTournamentData();
   const [searchParams] = useSearchParams();
 
   // Hydrate from URL params first (search palette, deep link, share),
@@ -202,6 +299,20 @@ const FactionView = () => {
 
   const factionRatingsRow = factionRatings[selectedFaction] || {};
   const builds = factionBuilds[selectedFaction] || [];
+  const offMetaLists = (unassignedWinningLists && unassignedWinningLists[selectedFaction]) || [];
+  // Infinite-scroll reveal for the off-meta winning-lists section.
+  const [offMetaVisible, setOffMetaVisible] = useState(8);
+  useEffect(() => { setOffMetaVisible(8); }, [selectedFaction]);
+  const offMetaSentinel = useRef(null);
+  useEffect(() => {
+    const node = offMetaSentinel.current;
+    if (!node || offMetaVisible >= offMetaLists.length) return undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) setOffMetaVisible((n) => n + 8);
+    }, { rootMargin: '400px' });
+    io.observe(node);
+    return () => io.disconnect();
+  }, [offMetaVisible, offMetaLists.length]);
 
   // When a build is selected, use its 0-10 ratings instead of the faction's
   const selectedBuildObj = selectedBuild != null
@@ -1279,6 +1390,34 @@ const FactionView = () => {
               </div>
             )}
 
+          </div>
+        )}
+
+        {/* Off-meta winning lists — winning lists that don't belong to any shown
+            build. Surfaces successful brews (and gives buildless factions real
+            content). Ordered win rate → games → date; infinite-scroll, uncapped. */}
+        {offMetaLists.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <span>Off-Meta Winning Lists</span>
+                <span className="text-slate-500 text-sm font-normal">{offMetaLists.length}</span>
+              </h3>
+              <div className="text-slate-400 text-[12px] mt-1">
+                Winning lists ({builds.length === 0 ? 'this faction has no clustered build yet — ' : ''}
+                don't match a dedicated build). Sorted by win rate, then games, then most recent.
+              </div>
+            </div>
+            <div className="space-y-3">
+              {offMetaLists.slice(0, offMetaVisible).map((ex) => (
+                <OffMetaListCard key={ex.listId} ex={ex} />
+              ))}
+            </div>
+            {offMetaVisible < offMetaLists.length && (
+              <div ref={offMetaSentinel} className="py-4 text-center text-slate-500 text-xs">
+                Loading more… ({offMetaVisible} of {offMetaLists.length})
+              </div>
+            )}
           </div>
         )}
 
