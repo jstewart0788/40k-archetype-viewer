@@ -238,7 +238,7 @@ function OffMetaListCard({ ex }) {
 }
 
 const FactionView = () => {
-  const { integratedFactionRatings: factionRatings, factionBuilds, unassignedWinningLists, dataMetadata } = useTournamentData();
+  const { integratedFactionRatings: factionRatings, factionBuilds, unassignedWinningLists, detachmentViews, detachmentListPool, dataMetadata } = useTournamentData();
   const [searchParams] = useSearchParams();
 
   // Hydrate from URL params first (search palette, deep link, share),
@@ -300,6 +300,11 @@ const FactionView = () => {
   const factionRatingsRow = factionRatings[selectedFaction] || {};
   const builds = factionBuilds[selectedFaction] || [];
   const offMetaLists = (unassignedWinningLists && unassignedWinningLists[selectedFaction]) || [];
+  const factionDetachments = (detachmentViews && detachmentViews[selectedFaction]) || [];
+  const factionListPool = (detachmentListPool && detachmentListPool[selectedFaction]) || {};
+  const [selectedDetachment, setSelectedDetachment] = useState('');
+  useEffect(() => { setSelectedDetachment(''); }, [selectedFaction]);
+  const detachmentObj = factionDetachments.find(d => d.name === selectedDetachment) || null;
   // Infinite-scroll reveal for the off-meta winning-lists section.
   const [offMetaVisible, setOffMetaVisible] = useState(8);
   useEffect(() => { setOffMetaVisible(8); }, [selectedFaction]);
@@ -1390,6 +1395,76 @@ const FactionView = () => {
               </div>
             )}
 
+          </div>
+        )}
+
+        {/* Search by detachment — the build treatment (win rate, top units, most
+            successful lists) grouped by detachment instead of NMF cluster. */}
+        {factionDetachments.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <span>Search by Detachment</span>
+                <span className="text-slate-500 text-sm font-normal">{factionDetachments.length}</span>
+              </h3>
+              <div className="text-slate-400 text-[12px] mt-1">
+                Win rate + most-successful lists for any detachment this faction runs. Skill-adjusted, same as builds.
+              </div>
+            </div>
+            <select
+              value={selectedDetachment}
+              onChange={(e) => setSelectedDetachment(e.target.value)}
+              className="w-full sm:w-96 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm mb-4"
+            >
+              <option value="">Select a detachment…</option>
+              {factionDetachments.map(d => (
+                <option key={d.name} value={d.name}>
+                  {d.name} — {(d.winRate * 100).toFixed(0)}% WR ({d.nLists} lists)
+                </option>
+              ))}
+            </select>
+
+            {detachmentObj && (() => {
+              const wr = detachmentObj.winRate * 100;
+              let wrCl = 'text-yellow-400';
+              if (wr >= 65) wrCl = 'text-emerald-400';
+              else if (wr >= 55) wrCl = 'text-green-400';
+              else if (wr < 45) wrCl = 'text-red-400';
+              const examples = (detachmentObj.exampleListIds || [])
+                .map(id => factionListPool[id]).filter(Boolean);
+              return (
+                <div className="rounded-lg bg-slate-800/40 border border-slate-700 p-5">
+                  <div className="flex flex-wrap justify-between items-baseline gap-3 mb-4 pb-3 border-b border-slate-700">
+                    <div className="text-lg font-bold text-purple-300">{detachmentObj.name}</div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className={`font-bold ${wrCl}`}>{wr.toFixed(0)}% WR</span>
+                      <span className="text-slate-400">{detachmentObj.wins}W/{detachmentObj.losses}L/{detachmentObj.draws}D</span>
+                      <span className="text-slate-500">{detachmentObj.nLists} lists · {detachmentObj.nGames} games</span>
+                    </div>
+                  </div>
+
+                  {detachmentObj.unitFrequency?.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-2">Most-run units</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {detachmentObj.unitFrequency.map(u => (
+                          <span key={u.datasheet} className="text-[11px] bg-slate-700/50 rounded px-2 py-0.5 text-slate-300">
+                            {titleCaseUnit(u.datasheet)} <span className="text-slate-500">{(u.pct * 100).toFixed(0)}%</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-2">
+                    Most successful lists ({examples.length})
+                  </div>
+                  <div className="space-y-3">
+                    {examples.map(ex => <OffMetaListCard key={ex.listId} ex={ex} />)}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

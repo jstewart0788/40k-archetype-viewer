@@ -34,6 +34,8 @@ export function TournamentDataProvider({ children }) {
       factionRatings:        raw.factionRatings || {},
       factionBuilds:         raw.factionBuilds || {},
       unassignedWinningLists: raw.unassignedWinningLists || {},
+      detachmentViews:       raw.detachmentViews || {},
+      detachmentListPool:    raw.detachmentListPool || {},
       archetypeMatchups:     raw.archetypeMatchups || {},
       buildMatchups:         raw.buildMatchups || {},
       buildVsBuildMatchups:  raw.buildVsBuildMatchups || {},
