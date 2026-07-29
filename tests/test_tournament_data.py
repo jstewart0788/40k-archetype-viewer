@@ -129,17 +129,130 @@ def test_every_build_has_required_fields(data):
 
 
 def test_build_winrates_are_plausible(data):
-    """No build should have a win rate outside [0.20, 0.80] — that's a
-    parser artifact or single-player phenomenon, not a real build."""
+    """Win rates must be internally consistent, and implausible only where the
+    sample is big enough for "implausible" to mean anything.
+
+    The previous version asserted 0.20 <= winRate <= 0.80 on every build
+    regardless of sample size. Across builds ranging from 15 to 310 games that
+    fires roughly 6% of weeks even when every build is truly a 50% build — it
+    was testing luck, not plausibility, and it blocked a deploy on a 16-3-2
+    record that is entirely consistent with a genuinely strong build.
+
+    The sample-size-independent tripwire is the gap between the Elo-adjusted
+    and raw win rates. Cluster contamination, a broken Elo join or duplicated
+    games all blow past it; a hot streak in a thin sample does not. Its
+    sensitivity does not decay as n falls.
+    """
+    ELO_ADJ_MAX_GAP = 0.15   # observed max 0.065
+    WIDE = (0.05, 0.95)      # gross-contamination bound, all builds
+    NARROW = (0.20, 0.80)    # original bound, only where n supports it
+    NARROW_MIN_GAMES = 40
+
     for fac, blds in data["factionBuilds"].items():
         for b in blds:
-            wr = b["winRate"]
+            wr, raw = b["winRate"], b["rawWinRate"]
+            w, l, dr, ng = b["wins"], b["losses"], b["draws"], b["nGames"]
+
+            assert w + l + dr == ng, (
+                f"{fac}/{b['name']}: wins+losses+draws={w+l+dr} != nGames={ng}"
+            )
+            assert ng >= b["nLists"], (
+                f"{fac}/{b['name']}: nGames={ng} < nLists={b['nLists']}"
+            )
+            if raw is not None and (w + l) > 0:
+                assert abs(raw - round(w / (w + l), 3)) <= 0.002, (
+                    f"{fac}/{b['name']}: rawWinRate={raw} disagrees with its "
+                    f"own record {w}-{l}"
+                )
             if wr is None:
                 continue
-            assert 0.20 <= wr <= 0.80, (
-                f"{fac}/{b['name']}: winRate={wr} implausible — likely "
-                f"cluster contamination or low-n outlier"
+            assert WIDE[0] <= wr <= WIDE[1], (
+                f"{fac}/{b['name']}: winRate={wr} outside {WIDE} — gross "
+                f"contamination, not a thin sample"
             )
+            if raw is not None:
+                assert abs(wr - raw) <= ELO_ADJ_MAX_GAP, (
+                    f"{fac}/{b['name']}: Elo-adjusted {wr} vs raw {raw} differ "
+                    f"by {abs(wr-raw):.3f} — the adjustment should never move a "
+                    f"build this far; suspect cluster contamination or a bad join"
+                )
+            if ng >= NARROW_MIN_GAMES:
+                assert NARROW[0] <= wr <= NARROW[1], (
+                    f"{fac}/{b['name']}: winRate={wr} implausible at n={ng} "
+                    f"games — likely cluster contamination"
+                )
+
+
+def test_no_detachment_misattribution(data):
+    """A build must never be presented as running a detachment it doesn't run.
+
+    Generated prose used to assert things like "this is War Horde at its most
+    character-dense" on a build fielding Green Tide — a correct rule attached
+    to the wrong detachment. Naming an OPPOSING faction's detachment is fine
+    (descriptions reference what beats the build); claiming one of your own
+    faction's detachments that the build doesn't field is the defect.
+    """
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from pipeline.attribution_guard import find_violations
+
+    # Detachment -> faction, derived from the snapshot itself so the test stays
+    # database-free. A detachment is "own-faction" for a build if any build in
+    # that same faction fields it.
+    by_faction: dict[str, set[str]] = {}
+    dp_by_name: dict[str, int] = {}
+    for fac, blds in data["factionBuilds"].items():
+        for b in blds:
+            for m in (b.get("detachmentMix") or []):
+                by_faction.setdefault(fac, set()).add(m["name"].lower())
+                if m.get("dp"):
+                    dp_by_name[m["name"].lower()] = m["dp"]
+
+    failures = []
+    for fac, blds in data["factionBuilds"].items():
+        legal = by_faction.get(fac, set())
+        if not legal:
+            continue
+        for b in blds:
+            for field, is_name in (("name", True), ("description", False)):
+                text = b.get(field) or ""
+                for v in find_violations(b, text, legal, dp_by_name,
+                                         name_field=is_name):
+                    failures.append(
+                        f"{fac}/{b['name']} [{field}]: claims '{v['detachment']}' "
+                        f"(runs it {v['share']:.0%}, reason={v['reason']})"
+                    )
+
+    assert not failures, (
+        f"{len(failures)} detachment misattribution(s):\n  " + "\n  ".join(failures[:20])
+    )
+
+
+def test_detachment_mix_reads_all_slots(data):
+    """detachmentMix must come from every detachment slot, not lists.detachment_id.
+
+    11e armies field a 2 DP main plus a 1 DP dip; reading a single stored slot
+    reports whichever one sorted first and mislabels the dip as the build's
+    detachment. Multi-slot builds therefore have shares summing above 1.0, and
+    every entry carries its DP cost.
+    """
+    builds = [b for blds in data["factionBuilds"].values() for b in blds]
+    with_mix = [b for b in builds if b.get("detachmentMix")]
+    assert with_mix, "no build has a detachmentMix"
+
+    for b in with_mix:
+        for m in b["detachmentMix"]:
+            assert "dp" in m, f"{b['name']}: detachmentMix entry missing dp"
+            assert 0 <= m["pct"] <= 1.0, f"{b['name']}: pct {m['pct']} out of range"
+
+    # At least one build must show multi-detachment armies, else we're still
+    # reading a single slot.
+    multi = [b for b in with_mix
+             if sum(m["pct"] for m in b["detachmentMix"]) > 1.05]
+    assert multi, (
+        "no build has detachment shares summing above 1.0 — detachmentMix "
+        "looks like it is still reading a single detachment slot per list"
+    )
 
 
 def test_playstyle_profile_kept_only_positive(data):
