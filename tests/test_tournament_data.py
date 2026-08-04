@@ -183,6 +183,29 @@ def test_build_winrates_are_plausible(data):
                 )
 
 
+def test_build_names_are_names(data):
+    """A build name must be a NAME, not prose.
+
+    2026-08-04: four builds shipped to the public site with raw model refusal
+    text as their name ("I need to stop and flag a critical error in the input
+    data. **The datasheets listed are NOT Ork units.**"). The model was right —
+    those clusters held the wrong faction entirely, because BCP Force
+    Disposition ids were being read as factions — but its objection became the
+    product. The detachment guards check what a name CLAIMS; nothing checked
+    that it was a name.
+    """
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from pipeline.name_archetypes import is_valid_name_shape
+
+    bad = []
+    for fac, blds in data["factionBuilds"].items():
+        for b in blds:
+            if not is_valid_name_shape(b.get("name") or ""):
+                bad.append(f"{fac}: {(b.get('name') or '')[:70]!r}")
+    assert not bad, f"{len(bad)} build name(s) are not names:\n  " + "\n  ".join(bad[:10])
+
+
 def test_no_detachment_misattribution(data):
     """A build must never be presented as running a detachment it doesn't run.
 
