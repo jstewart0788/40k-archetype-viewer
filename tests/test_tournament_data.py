@@ -39,6 +39,10 @@ REQUIRED_TOP_KEYS = [
     "factionBuilds",
     "buildMatchups",
     "buildVsBuildMatchups",
+    # Both drive the search-by-detachment view and were absent from this list,
+    # so either could have vanished from the payload without a test noticing.
+    "detachmentViews",
+    "detachmentListPool",
 ]
 
 
@@ -512,3 +516,70 @@ def test_no_source_attribution_in_tracked_source_files():
     assert not leaks, "Tracked files leak source-attribution:\n" + "\n".join(
         f"  {p}:{ln}  {snippet}" for p, ln, snippet in leaks[:20]
     )
+
+
+# ── detachment view: population invariants ──────────────────────────────────
+# These assert IMPOSSIBLE properties, not quality thresholds. Every one of them
+# was violated in the payload published on 2026-08-10, because the view built
+# four different list populations and divided one by another.
+
+def test_detachment_unit_frequency_within_its_denominator(data):
+    """A unit cannot appear in more lists than the view counted.
+
+    Fired on 420 of 3,072 rows (max 1.542) when the numerator came from every
+    list holding the detachment — no requirement to have played, no edition
+    gate, no unfieldable filter — while the denominator counted only lists that
+    had played an eligible game.
+    """
+    for fac, cells in (data.get("detachmentViews") or {}).items():
+        for c in cells:
+            denom = c.get("unitFrequencyNLists", c["nLists"])
+            for u in c.get("unitFrequency") or []:
+                assert u["nLists"] <= denom, (
+                    f"{fac}/{c['name']}: {u['datasheet']} in {u['nLists']} lists "
+                    f"but the view counted only {denom}")
+                assert u["pct"] <= 1.0, (
+                    f"{fac}/{c['name']}: {u['datasheet']} pct={u['pct']}")
+
+
+def test_detachment_nlists_agrees_with_winrate_population(data):
+    """nLists must count the lists the win rate was computed from.
+
+    Thousand Sons "Hexwarp Thrallband" published nLists=146 beside a win rate
+    derived from 10 lists, because the win rate excluded armies that cannot be
+    fielded under current points and the list count did not.
+    """
+    for fac, cells in (data.get("detachmentViews") or {}).items():
+        for c in cells:
+            assert c["nLists"] <= c.get("nListsTotal", c["nLists"]), (
+                f"{fac}/{c['name']}: nLists {c['nLists']} > nListsTotal")
+            assert c["wins"] + c["losses"] + c["draws"] == c["nGames"], (
+                f"{fac}/{c['name']}: W/L/D does not sum to nGames")
+            if c["nGames"] > 0:
+                assert c["nLists"] > 0, (
+                    f"{fac}/{c['name']}: {c['nGames']} games from 0 lists")
+
+
+def test_detachment_examples_resolve_in_pool(data):
+    """Every example id must exist in its faction's pool — a dangling id
+    renders as a blank card."""
+    pool = data.get("detachmentListPool") or {}
+    for fac, cells in (data.get("detachmentViews") or {}).items():
+        for c in cells:
+            for lid in c.get("exampleListIds") or []:
+                assert lid in pool.get(fac, {}), (
+                    f"{fac}/{c['name']}: example {lid} missing from the pool")
+
+
+def test_build_unit_frequency_within_its_denominator(data):
+    """Same invariant on the build view. It holds today, and nothing guarded
+    it — the identical defect shipped on the detachment view for weeks."""
+    for fac, builds in data["factionBuilds"].items():
+        for b in builds:
+            denom = b.get("unitFrequencyNLists") or b.get("nLists")
+            if not denom:
+                continue
+            for u in b.get("unitFrequency") or []:
+                assert u["nLists"] <= denom and u["pct"] <= 1.0, (
+                    f"{fac}/{b['name']}: {u['datasheet']} {u['nLists']}/{denom} "
+                    f"pct={u['pct']}")

@@ -1338,7 +1338,12 @@ const FactionView = () => {
                                   <td className="py-1.5 text-slate-300 pr-2">{titleCaseUnit(u.datasheet)}</td>
                                   <td className={`py-1.5 text-right font-semibold whitespace-nowrap ${pctColor}`}>
                                     {pct.toFixed(0)}%
-                                    <span className="text-slate-500 font-normal ml-1">({u.nLists}/{selectedBuildObj.nLists})</span>
+                                    {/* Denominator MUST be the one the percentage was computed
+                                        against. unitFrequency is counted over a recent-lists
+                                        window, so dividing by the build's full nLists printed a
+                                        fraction contradicting the percentage next to it —
+                                        "100% (7/17)" on 2,814 of 2,880 rendered rows. */}
+                                    <span className="text-slate-500 font-normal ml-1">({u.nLists}/{selectedBuildObj.unitFrequencyNLists ?? selectedBuildObj.nLists})</span>
                                   </td>
                                   <td className="py-1.5 text-right text-slate-400 hidden sm:table-cell">{u.avgSquads}</td>
                                   <td className="py-1.5 text-right text-slate-400 hidden sm:table-cell">{u.avgPts}</td>
@@ -1476,6 +1481,21 @@ const FactionView = () => {
                   {detachmentObj.unitFrequency?.length > 0 && (
                     <div className="mb-4">
                       <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-2">Most-run units</div>
+                      {/* Name the population the shares were counted over. These used to be
+                          divided by a different list count than they were counted from, so
+                          420 of 3,072 shares published above 100%. */}
+                      <div className="text-slate-400 mb-2 text-[11px]">
+                        Share of the{' '}
+                        {(detachmentObj.unitFrequencyNLists ?? detachmentObj.nLists).toLocaleString()}{' '}
+                        <span className="text-white">{detachmentObj.name}</span> lists that can still be
+                        fielded and have played a recorded game.
+                        {detachmentObj.unitFrequencyNLists != null
+                          && detachmentObj.unitFrequencyNLists < 20 && (
+                          <span className="text-amber-400/80">
+                            {' '}Small sample — grows as more events are played.
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
                         {detachmentObj.unitFrequency.map(u => (
                           <span key={u.datasheet} className="text-[11px] bg-slate-700/50 rounded px-2 py-0.5 text-slate-300">
@@ -1483,6 +1503,12 @@ const FactionView = () => {
                           </span>
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {!detachmentObj.unitFrequency?.length && (
+                    <div className="mb-4 text-[11px] text-slate-500">
+                      No unit breakdown — no list running this detachment can still be fielded
+                      under the current points.
                     </div>
                   )}
 
