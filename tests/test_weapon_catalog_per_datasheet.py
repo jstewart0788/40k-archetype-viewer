@@ -98,11 +98,14 @@ def test_catalog_does_not_collapse_same_named_weapons(conn):
 
     by_ds, _ = load_weapon_catalog(conn)
     seen: dict[str, set] = {}
-    for (_ds_id, name), e in by_ds.items():
+    for (_ds_id, name), profiles in by_ds.items():
+        # Compare the same representative the reference query picks: the first
+        # profile, which the loader writes in (datasheet, name, id) order.
+        e = profiles[0]
         seen.setdefault(name, set()).add(
             (e["attacks_text"], e["strength"], e["ap"], e["weapon_type"])
         )
-    got = sum(1 for profiles in seen.values() if len(profiles) > 1)
+    got = sum(1 for variants in seen.values() if len(variants) > 1)
 
     # >= not ==, deliberately. The failure mode is COLLAPSE, and any collapse
     # drives this below `expected`; a name-keyed loader scores 0 against 242.
@@ -118,53 +121,62 @@ def test_catalog_does_not_collapse_same_named_weapons(conn):
     )
 
 
-def test_dual_profile_weapons_are_a_known_and_bounded_gap(conn):
-    """Some weapons carry TWO profiles on ONE datasheet — a shooting profile and
-    a melee profile under the same name (castellan axe, abyssal lance).
+def test_dual_profile_weapons_keep_both_profiles(conn):
+    """A weapon carrying BOTH a shooting and a melee profile on one datasheet
+    must keep both.
 
-    A (datasheet, name) key can hold only one of them, so which one wins is
-    decided by the id tie-break. That is deterministic but arbitrary: a castellan
-    axe counted as ranged contributes nothing to melee attack volume, and vice
-    versa. This is a PRE-EXISTING modelling gap, not a regression — the old
-    name-only catalog had it too and worse — and fixing it properly means keying
-    on (datasheet, name, weapon_type) and letting one parsed string contribute to
-    both volumes while still counting as a single match.
+    Castellan axes and abyssal lances shoot AND fight — 48 names across 119
+    (datasheet, name) pairs, every one a melee/ranged dual rather than a data
+    error. Keeping a single profile let the id tie-break silently decide whether
+    such a weapon counted toward melee or ranged attack volume, charging one
+    phase with everything and the other with nothing.
 
-    This test does not assert the gap is fixed. It PINS ITS SIZE so it cannot
-    grow unnoticed and so nobody rediscovers it as a mystery. Measured
-    2026-08-11: 48 names, 119 (datasheet, name) pairs, all of them melee/ranged
-    duals — zero are genuine data errors.
+    So catalog values are LISTS. One parsed weapon string still counts as ONE
+    match; each profile contributes its attacks to its own phase.
     """
     if _target_edition() != "11e":
         pytest.skip("per-datasheet weapon catalog is 11e-only")
+    from pipeline.list_features import load_weapon_catalog
 
     with conn.cursor() as cur:
         cur.execute("""
-            WITH per_ds AS (
-              SELECT w.normalized_name AS nm, dw.datasheet_id AS ds,
-                     count(DISTINCT (w.attacks, w.strength, w.ap, w.weapon_type)::text) AS np,
-                     count(DISTINCT w.weapon_type) AS nt
-                FROM wh_datasheet_weapons dw
-                JOIN wh_weapon_stats w ON w.id = dw.weapon_id
-               WHERE w.edition = '11e'
-               GROUP BY 1, 2
-            )
-            SELECT count(DISTINCT nm) FILTER (WHERE np > 1),
-                   count(DISTINCT nm) FILTER (WHERE np > 1 AND nt > 1)
-              FROM per_ds
+            SELECT dw.datasheet_id, w.normalized_name
+              FROM wh_datasheet_weapons dw
+              JOIN wh_weapon_stats w ON w.id = dw.weapon_id
+             WHERE w.edition = '11e'
+             GROUP BY 1, 2
+            HAVING count(DISTINCT w.weapon_type) > 1
         """)
-        n_names, n_dual = cur.fetchone()
+        duals = cur.fetchall()
 
-    assert n_names == n_dual, (
-        f"{n_names - n_dual} weapon name(s) differ within a single datasheet "
-        f"WITHOUT being a melee/ranged pair. Every known case is a dual-profile "
-        f"weapon; anything else is a catalogue import defect worth reading."
+    assert duals, (
+        "no dual-profile weapons found in the reference data — either the "
+        "catalogue import regressed, or this test is reading the wrong tables"
     )
-    assert n_names <= 60, (
-        f"{n_names} names now carry two profiles on one datasheet, up from the "
-        f"48 measured on 2026-08-11. The (datasheet, name) key silently drops "
-        f"one profile per pair, so this gap growing means more attack volume is "
-        f"being mis-assigned between the melee and ranged buckets."
+
+    by_ds, by_name = load_weapon_catalog(conn)
+    # The loader strips the leading '➤' mode marker from keys, so normalize the
+    # reference names the same way or this compares two different strings.
+    missing = [
+        (ds, nm) for ds, nm in duals
+        if len({p["weapon_type"]
+                for p in by_ds.get((ds, (nm or "").lstrip("➤").strip()), [])}) < 2
+    ]
+    assert not missing, (
+        f"{len(missing)} of {len(duals)} dual-profile weapons lost a profile, "
+        f"e.g. {missing[:3]}. Their attacks are being charged entirely to one "
+        f"phase."
+    )
+
+    # The name-only fallback must NOT do this. It is keyed by name alone, so
+    # accumulating every profile would make "close combat weapon" carry all 397
+    # datasheets' profiles and charge one parsed string with the sum — which is
+    # exactly the bug this suite caught during development.
+    worst = max(len(v) for v in by_name.values())
+    assert worst == 1, (
+        f"the name-only fallback holds up to {worst} profiles under one name; "
+        f"it must keep exactly one deterministic representative, or a single "
+        f"weapon string is charged with the sum of every datasheet's version"
     )
 
 
@@ -186,7 +198,7 @@ def test_catalog_is_independent_of_row_order(conn):
     conn.rollback()
 
     def sig(d):
-        return {k: v["attacks_text"] for k, v in d.items()}
+        return {k: tuple(p["attacks_text"] for p in v) for k, v in d.items()}
 
     assert sig(first_ds) == sig(second_ds), (
         "per-datasheet catalog changed between two loads in one session — "
