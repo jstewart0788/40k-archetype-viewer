@@ -551,8 +551,12 @@ def test_detachment_nlists_agrees_with_winrate_population(data):
     """
     for fac, cells in (data.get("detachmentViews") or {}).items():
         for c in cells:
-            assert c["nLists"] <= c.get("nListsTotal", c["nLists"]), (
-                f"{fac}/{c['name']}: nLists {c['nLists']} > nListsTotal")
+            # nListsPlayed, not nListsTotal — the build view uses that name for
+            # a different population (cluster members, including lists that
+            # never played), and one name for two populations is the confusion
+            # this suite exists to prevent.
+            assert c["nLists"] <= c.get("nListsPlayed", c["nLists"]), (
+                f"{fac}/{c['name']}: nLists {c['nLists']} > nListsPlayed")
             assert c["wins"] + c["losses"] + c["draws"] == c["nGames"], (
                 f"{fac}/{c['name']}: W/L/D does not sum to nGames")
             if c["nGames"] > 0:

@@ -1499,7 +1499,16 @@ const FactionView = () => {
                       <div className="flex flex-wrap gap-1.5">
                         {detachmentObj.unitFrequency.map(u => (
                           <span key={u.datasheet} className="text-[11px] bg-slate-700/50 rounded px-2 py-0.5 text-slate-300">
-                            {titleCaseUnit(u.datasheet)} <span className="text-slate-500">{(u.pct * 100).toFixed(0)}%</span>
+                            {titleCaseUnit(u.datasheet)}{' '}
+                            {/* Show the fraction, not just the percentage. A bare "100%" hides
+                                whether it rests on 40 lists or 4 — and printing the fraction is
+                                what made the equivalent build-view contradiction visible. */}
+                            <span className="text-slate-500">
+                              {(u.pct * 100).toFixed(0)}%
+                              <span className="text-slate-600 ml-1">
+                                ({u.nLists}/{detachmentObj.unitFrequencyNLists ?? detachmentObj.nLists})
+                              </span>
+                            </span>
                           </span>
                         ))}
                       </div>
