@@ -177,3 +177,77 @@ def test_allowlist_entries_are_still_real():
         "Stale entries in ALLOWED — the exception is no longer needed, so remove "
         "it rather than leaving a permanent hole: " + "; ".join(stale)
     )
+
+
+# ── Shared-name detachment copies must stay interchangeable ─────────────────
+
+def test_shared_detachment_copies_differ_only_in_points():
+    """A detachment name shared across factions must have identical rules in
+    every copy, differing at most in its detachment-point cost.
+
+    WHY THIS IS A TRIPWIRE AND NOT A FIX. Space Marine chapters became
+    first-class factions, so each shared detachment now exists once per chapter
+    — 16 names, up to 6 copies each. 1,270 of 17,007 junction rows bind a list
+    to a DIFFERENT faction's copy than the army's own.
+
+    That is currently HARMLESS, and this test is what keeps it harmless. Every
+    consumer re-resolves by NAME: the detachment view groups on
+    (faction, name), and the points check walks the faction lineage by name
+    rather than trusting the junction. Measured 2026-08-11: all 16 shared names
+    have byte-identical ability text across copies, and only two — Stormlance
+    Task Force and Bastion Task Force — differ at all, in `dp` alone, which is
+    exactly what the lineage lookup exists to resolve.
+
+    If a future dataslate makes one chapter's copy of a shared detachment carry
+    different RULES, that assumption breaks silently: lists would inherit
+    whichever copy the junction happened to bind, and nothing would error. This
+    test fires first, and the fix then is to re-resolve the junction with
+    faction_id (resolve_detachment_from_candidates already accepts one; the
+    call sites do not pass it).
+    """
+    import psycopg2
+    try:
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST", "localhost"),
+            port=int(os.environ.get("DB_PORT", "5433")),
+            dbname=os.environ.get("DB_NAME", "wh40k_meta"),
+            user=os.environ.get("DB_USER", "wh40k"),
+            password=os.environ.get("DB_PASSWORD", "localdev"),
+            connect_timeout=3,
+        )
+    except Exception as exc:                                   # pragma: no cover
+        import pytest
+        pytest.skip(f"database unreachable: {exc}")
+
+    edition = _target_edition()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                WITH shared AS (
+                  SELECT name FROM wh_detachments
+                   WHERE edition = %s GROUP BY name HAVING count(*) > 1
+                )
+                SELECT wd.name, count(DISTINCT coalesce(a.sig, ''))
+                  FROM wh_detachments wd
+                  JOIN shared s ON s.name = wd.name
+                  LEFT JOIN LATERAL (
+                    SELECT string_agg(da.name || '|' || coalesce(da.description, ''),
+                                      '~' ORDER BY da.name) AS sig
+                      FROM wh_detachment_abilities da
+                     WHERE da.detachment_id = wd.id
+                  ) a ON TRUE
+                 WHERE wd.edition = %s
+                 GROUP BY wd.name
+                HAVING count(DISTINCT coalesce(a.sig, '')) > 1
+            """, (edition, edition))
+            divergent = cur.fetchall()
+    finally:
+        conn.close()
+
+    assert not divergent, (
+        "These shared-name detachments now have DIFFERENT rules per faction "
+        "copy, so binding a list to the wrong copy silently gives it the wrong "
+        "rules: "
+        + ", ".join(f"{n} ({c} distinct ability sets)" for n, c in divergent)
+        + ". Re-resolve list_detachments with faction_id before shipping."
+    )
