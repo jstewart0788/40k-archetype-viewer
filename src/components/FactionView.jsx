@@ -1304,15 +1304,25 @@ const FactionView = () => {
                   {buildTab === 'units' && (
                     <div>
                       <div className="text-slate-400 mb-2 text-[11px]">
+                        {/* The basis string comes from the pipeline, which owns the
+                            population policy. Hardcoding "lists played since the last
+                            points update" here made the caption lie the moment that
+                            policy changed — the copy has to follow the data. */}
                         Frequency that each datasheet appears in the{' '}
                         {(selectedBuildObj.unitFrequencyNLists ?? selectedBuildObj.nLists).toLocaleString()}{' '}
-                        <span className="text-white">{selectedBuildObj.name}</span> lists played since the
-                        last points update.
-                        {selectedBuildObj.unitFrequencyNLists != null
-                          && selectedBuildObj.unitFrequencyNLists < 20 && (
+                        <span className="text-white">{selectedBuildObj.name}</span>{' '}
+                        {selectedBuildObj.unitFrequencyBasis || 'lists'}.
+                        {selectedBuildObj.unitFrequencyWeighted && (
+                          <span className="text-slate-500">
+                            {' '}Recent lists count for more, so a share can differ from the
+                            plain count beside it.
+                          </span>
+                        )}
+                        {selectedBuildObj.unitFrequencyESS != null
+                          && selectedBuildObj.unitFrequencyESS < 8 && (
                           <span className="text-amber-400/80">
-                            {' '}Small sample — what armies bring changes the week points change, so this
-                            counts only current-rules lists and grows as more events are played.
+                            {' '}Thin evidence — this build has few lists behind it, so treat
+                            these shares as indicative only.
                           </span>
                         )}
                       </div>
@@ -1355,8 +1365,12 @@ const FactionView = () => {
                       </div>
                       {!selectedBuildObj.unitFrequency?.length && (
                         <div className="text-slate-500 italic mt-2">
+                          {/* Under the old current-rules gate an empty sample meant
+                              "nobody has played this since the patch". The population is
+                              now every fieldable list in the build, so zero means we
+                              parsed no units at all — a data gap, not a meta signal. */}
                           {selectedBuildObj.unitFrequencyNLists === 0
-                            ? 'Nobody has played this build since the last points update.'
+                            ? 'No parsed unit data for this build yet.'
                             : 'No unit data available.'}
                         </div>
                       )}

@@ -238,7 +238,12 @@ def test_no_detachment_misattribution(data):
     dp_by_name: dict[str, int] = {}
     for fac, blds in data["factionBuilds"].items():
         for b in blds:
-            for m in (b.get("detachmentMix") or []):
+            # Read the FULL-POOL mix, matching the guard. detachmentMix is a
+            # recency-weighted, top-N display sample; judging a name derived
+            # from the whole cluster against it convicted true names — Chaos
+            # Daemons "Plague Legion Hammer" runs Plague Legion in 9 of 12
+            # cluster lists but the 2-list display sample read 0%.
+            for m in (b.get("detachmentMixFull") or b.get("detachmentMix") or []):
                 by_faction.setdefault(fac, set()).add(m["name"].lower())
                 if m.get("dp"):
                     dp_by_name[m["name"].lower()] = m["dp"]
@@ -449,25 +454,49 @@ def test_no_unknown_faction(data):
     assert not bad, f"Catch-all sentinel leaked into factionRatings: {bad}"
 
 
-def test_no_low_n_buildvsbuild_cells(data):
-    """Docs claim cells with n<5 are hidden in the explorer. The Predictor
-    additionally guards them with an 'insufficient direct sample' warning,
-    so we keep them in the JSON — but if more than 25% of cells fall under
-    the threshold, the matchup matrix is too thin for downstream confidence
-    and the contamination filter or extraction window probably needs a look."""
+def test_buildvsbuild_cells_cannot_exceed_the_games_that_made_them(data):
+    """Build-vs-build cells must not contain more observations than exist.
+
+    REPLACES a 25%-of-cells-under-n=5 threshold that was mis-specified and
+    fired for the first time on 2026-08-11, when the corpus crossed the
+    20,000-game trigger it had been dormant below. It read 93% and would have
+    blocked a deploy over arithmetic:
+
+        183 builds -> 16,653 possible pairs, 10,056 of them populated
+        20,848 games spread over those cells -> 1.9 games per cell, median 1
+
+    Sparsity here is structural and gets WORSE as data accumulates, because
+    pairs grow with the SQUARE of the build count while games grow linearly.
+    Reaching an average of 5 per populated cell would take roughly 50,000
+    games, and the extra games would also mint new builds. So the threshold
+    measured corpus shape, not data health, and could only ever be satisfied
+    by a corpus that no longer exists.
+
+    What IS impossible, and worth asserting: a matrix holding more games than
+    were played, a single cell citing more games than the whole corpus, or
+    more populated pairs than pairs that exist. Each of those means
+    double-counting or fabrication, which is the failure this was reaching for.
+    """
     cells = [c for opps in data["buildVsBuildMatchups"].values() for c in opps.values()]
     if not cells:
         return
-    # A thin corpus (e.g. an edition launch window) cannot populate the direct
-    # build-vs-build matrix at n>=5 — ~2k games spread over thousands of build
-    # pairs is almost entirely sparse, and the Predictor falls back to EB-shrunk
-    # + LightGBM predictions with an "insufficient direct sample" warning. So
-    # this data-health gate only bites once the corpus is large enough that
-    # sparsity would signal a real extraction/contamination problem.
-    if (data.get("metadata", {}).get("gamesCount") or 0) < 20_000:
-        return
-    low_n_pct = sum(1 for c in cells if c.get("n", 0) < 5) / len(cells)
-    assert low_n_pct < 0.25, f"Too many sparse cells: {low_n_pct:.0%} have n<5"
+    games = data.get("metadata", {}).get("gamesCount") or 0
+    n_builds = sum(len(v) for v in data["factionBuilds"].values())
+    total_n = sum(c.get("n", 0) for c in cells)
+    max_n = max(c.get("n", 0) for c in cells)
+
+    # Symmetric storage may count each game from both sides, hence 2x.
+    assert total_n <= 2 * games, (
+        f"build-vs-build cells hold {total_n:,} observations from a corpus of "
+        f"{games:,} games — double-counted or fabricated"
+    )
+    assert max_n <= games, (
+        f"a single cell cites {max_n:,} games from a corpus of {games:,}"
+    )
+    assert len(cells) <= n_builds * n_builds, (
+        f"{len(cells):,} populated pairs from {n_builds} builds — more cells "
+        f"than pairs exist"
+    )
 
 
 def test_metadata_faction_count_matches_data(data):
@@ -587,3 +616,44 @@ def test_build_unit_frequency_within_its_denominator(data):
                 assert u["nLists"] <= denom and u["pct"] <= 1.0, (
                     f"{fac}/{b['name']}: {u['datasheet']} {u['nLists']}/{denom} "
                     f"pct={u['pct']}")
+
+
+def test_composition_sample_never_exceeds_its_membership(data):
+    """A build's composition sample cannot be larger than the build, and a unit
+    cannot appear in more lists than the sample holds.
+
+    True under every population policy and every corpus size, so it cannot fire
+    on a thin week — unlike the sparsity threshold removed on 2026-08-11, which
+    measured corpus shape rather than data health.
+
+    What it catches: a composition population drifting out of sync with the
+    membership it claims to describe. That drift is what let a build advertise
+    a detachment mix drawn from 2 lists while reporting full coverage, and what
+    let a percentage disagree with the fraction printed beside it.
+    """
+    for fac, builds in data["factionBuilds"].items():
+        for b in builds:
+            n_members = b.get("nLists")
+            if n_members is None:
+                continue
+            for field, count_key in (("unitFrequency", "unitFrequencyNLists"),
+                                     ("detachmentMix", "detachmentMixNLists")):
+                sample = b.get(count_key)
+                if sample is None:
+                    continue
+                assert sample <= n_members, (
+                    f"{fac}/{b['name']}: {count_key}={sample} exceeds "
+                    f"nLists={n_members} — the sample is larger than the build"
+                )
+                # Raw per-entry counts are unweighted, so they are bounded by
+                # the raw sample size even when the published share is weighted.
+                for entry in (b.get(field) or []):
+                    assert entry["nLists"] <= sample, (
+                        f"{fac}/{b['name']}: {entry.get('datasheet') or entry.get('name')} "
+                        f"appears in {entry['nLists']} lists but the sample is {sample}"
+                    )
+            cov = b.get("detachmentCoverage")
+            if cov is not None:
+                assert 0.0 <= cov <= 1.0, (
+                    f"{fac}/{b['name']}: detachmentCoverage={cov} outside [0,1]"
+                )
