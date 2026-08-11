@@ -895,6 +895,22 @@ const FactionView = () => {
                           {build.nLists.toLocaleString()} lists · {build.nGames.toLocaleString()} games
                         </div>
                       </div>
+                      {/* Superseded: this build's detachment combination is no
+                          longer legal, so too few games remain under current
+                          rules to state a win rate. Showing the survivors would
+                          be worse than saying nothing — one such build keeps two
+                          games, both wins, which would read as 80%. */}
+                      {wrPct == null && build.winRateSuppressed && (
+                        <div className="shrink-0 flex flex-col items-end gap-0.5 max-w-[9.5rem]">
+                          <div className="text-[11px] font-semibold text-amber-400 leading-tight text-right">
+                            No current-rules win rate
+                          </div>
+                          <div className="text-[10px] text-slate-500 leading-snug text-right">
+                            This build&rsquo;s detachment combination is no longer legal.
+                            {build.nGames ? ` Only ${build.nGames} game${build.nGames === 1 ? '' : 's'} remain.` : ''}
+                          </div>
+                        </div>
+                      )}
                       {wrPct != null && (
                         <div className="shrink-0 flex flex-col items-end gap-0.5">
                           <div className={`text-2xl font-bold leading-none ${wrColor}`}>{wrPct}%</div>
@@ -1288,7 +1304,17 @@ const FactionView = () => {
                   {buildTab === 'units' && (
                     <div>
                       <div className="text-slate-400 mb-2 text-[11px]">
-                        Frequency that each datasheet appears in the {selectedBuildObj.nLists.toLocaleString()} lists assigned to <span className="text-white">{selectedBuildObj.name}</span>.
+                        Frequency that each datasheet appears in the{' '}
+                        {(selectedBuildObj.unitFrequencyNLists ?? selectedBuildObj.nLists).toLocaleString()}{' '}
+                        <span className="text-white">{selectedBuildObj.name}</span> lists played since the
+                        last points update.
+                        {selectedBuildObj.unitFrequencyNLists != null
+                          && selectedBuildObj.unitFrequencyNLists < 20 && (
+                          <span className="text-amber-400/80">
+                            {' '}Small sample — what armies bring changes the week points change, so this
+                            counts only current-rules lists and grows as more events are played.
+                          </span>
+                        )}
                       </div>
                       <div className="overflow-x-auto -mx-5 px-5">
                         <table className="w-full min-w-[420px]">
@@ -1323,7 +1349,11 @@ const FactionView = () => {
                         </table>
                       </div>
                       {!selectedBuildObj.unitFrequency?.length && (
-                        <div className="text-slate-500 italic mt-2">No unit data available.</div>
+                        <div className="text-slate-500 italic mt-2">
+                          {selectedBuildObj.unitFrequencyNLists === 0
+                            ? 'Nobody has played this build since the last points update.'
+                            : 'No unit data available.'}
+                        </div>
                       )}
 
                       {/* Enhancement frequency — only render the table if the

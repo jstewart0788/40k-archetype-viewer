@@ -110,11 +110,19 @@ def test_no_axis_has_all_factions_at_ten(data):
 def test_every_build_has_minimum_lists(data):
     """A build with 1-2 lists isn't a meaningful cluster. We've used
     this as a filter elsewhere; assert it here so a regression in NMF
-    sizing trips."""
+    sizing trips.
+
+    Asserted on nListsTotal (the whole cluster), not nLists. Since the
+    unfieldable-army rule, nLists counts only members that can still be
+    fielded — a build whose detachment combination was made illegal by a
+    points patch legitimately drops to 1-2 there while its cluster is
+    unchanged. Judging NMF sizing on the filtered count would fire on a
+    rules change rather than on a clustering regression."""
     for fac, blds in data["factionBuilds"].items():
         for b in blds:
-            assert b["nLists"] >= 3, (
-                f"{fac}/{b['name']}: nLists={b['nLists']} below the 3-list floor"
+            n = b.get("nListsTotal", b["nLists"])
+            assert n >= 3, (
+                f"{fac}/{b['name']}: nListsTotal={n} below the 3-list floor"
             )
 
 
@@ -189,7 +197,7 @@ def test_build_names_are_names(data):
     2026-08-04: four builds shipped to the public site with raw model refusal
     text as their name ("I need to stop and flag a critical error in the input
     data. **The datasheets listed are NOT Ork units.**"). The model was right —
-    those clusters held the wrong faction entirely, because BCP Force
+    those clusters held the wrong faction entirely, because upstream Force
     Disposition ids were being read as factions — but its objection became the
     product. The detachment guards check what a name CLAIMS; nothing checked
     that it was a name.
