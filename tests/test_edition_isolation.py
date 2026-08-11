@@ -64,6 +64,25 @@ ALLOWED: dict[tuple[str, str], str] = {
     ("pipeline/list_features.py", "wh_wargear"):
         "Inside the explicit `if TARGET_EDITION == '10e'` branch of "
         "load_weapon_catalog; the 11e path reads wh_weapon_stats.",
+    ("db/migrations/012_canonical_views.sql", "wh_datasheets"):
+        "Historical: this migration CREATED the original 10e canonical view "
+        "when 10e was the target. Migration 023 then repointed that view onto "
+        "wh_datasheet_stats and 028 replaced it again, so the read no longer "
+        "exists in the live database — only in this immutable file. Migrations "
+        "are forward-only and are never edited; allowlisting is the only "
+        "option short of not scanning migrations, which is what hid the "
+        "genuine 023 hop for a day.",
+    ("db/migrations/013_canonical_view_fix.sql", "wh_datasheets"):
+        "Same as 012 — a 10e-era fix to the same view, long superseded.",
+    ("db/migrations/023_canonical_view_11e.sql", "wh_datasheets"):
+        "Alias hop, same reason as build_ui_data.py above: wh_unit_aliases is "
+        "FK'd to 10e datasheet ids, so an alias resolves via the 10e row's "
+        "NAME into the 11e table. Superseded in practice by migration 028, "
+        "which moved the hop into mv_datasheet_resolution — this entry stays "
+        "only because migrations are forward-only and the file is immutable.",
+    ("db/migrations/028_faction_aware_datasheet_resolution.sql", "wh_datasheets"):
+        "Same alias hop, now centralised in mv_datasheet_resolution so it "
+        "exists in exactly one place instead of once per resolution site.",
 }
 
 # The legacy importer owns these tables and must reference them. Its filename
@@ -96,6 +115,11 @@ def _scanned_files() -> list[str]:
     files = sorted(glob.glob(os.path.join(REPO, "pipeline", "*.py")))
     files += sorted(glob.glob(os.path.join(REPO, "dbt", "models", "**", "*.sql"),
                               recursive=True))
+    # Migrations were a blind spot until 2026-08-10: they DEFINE the views the
+    # pipeline reads, so a 10e table reached through a view was invisible to a
+    # guard that only scanned callers. Migration 023's alias hop had sat
+    # unscanned since the day this test shipped.
+    files += sorted(glob.glob(os.path.join(REPO, "db", "migrations", "*.sql")))
     # dbt/target holds compiled copies of the same models — duplicate hits.
     return [f for f in files
             if os.sep + "target" + os.sep not in f
