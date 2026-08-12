@@ -155,7 +155,19 @@ def test_build_winrates_are_plausible(data):
     games all blow past it; a hot streak in a thin sample does not. Its
     sensitivity does not decay as n falls.
     """
-    ELO_ADJ_MAX_GAP = 0.15   # observed max 0.065
+    # Gross-contamination bound, NOT a claim about how much skill adjustment
+    # is reasonable. The old value (0.15, "observed max 0.065") was calibrated
+    # when the opponent-strength correction was inert because it only ever saw
+    # one edition of games — 68% of matchups were default-vs-default. With
+    # ratings carried across editions the correction does real work: median
+    # 2pp, and 16.6pp on Orks "Boyz Warband", whose pilots average 1682 Elo
+    # against a 1514 corpus mean and a +105 edge over their opponents. That
+    # gap predicts 64.7% from skill alone, so a 77.8% raw rate SHOULD fall to
+    # ~61%. A magnitude threshold cannot separate that from contamination —
+    # only the sign and size of the pilot-vs-opponent gap can, and that needs
+    # the database. So this stays deliberately loose: it catches a rate that
+    # has become untethered, not one that has been legitimately corrected.
+    ELO_ADJ_MAX_GAP = 0.30
     WIDE = (0.05, 0.95)      # gross-contamination bound, all builds
     NARROW = (0.20, 0.80)    # original bound, only where n supports it
     NARROW_MIN_GAMES = 40
