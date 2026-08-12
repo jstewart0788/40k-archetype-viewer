@@ -657,3 +657,43 @@ def test_composition_sample_never_exceeds_its_membership(data):
                 assert 0.0 <= cov <= 1.0, (
                     f"{fac}/{b['name']}: detachmentCoverage={cov} outside [0,1]"
                 )
+
+
+def test_build_names_unique_within_faction(data):
+    """Two builds in one faction cannot share a name — they are different
+    builds, and a name that identifies both identifies neither.
+
+    Ten collision groups existed on 2026-08-11, including a pair differing only
+    in capitalisation. The dedup pass had three silent exits and a fourth hole:
+    the foreign-detachment pass rewrites names AFTER dedup with no uniqueness
+    check, so it could reintroduce a collision that had already been resolved.
+    """
+    for faction, builds in data["factionBuilds"].items():
+        seen: dict[str, str] = {}
+        for b in builds:
+            key = (b.get("name") or "").strip().lower()
+            if not key:
+                continue
+            assert key not in seen, (
+                f"{faction}: two builds share the name {b['name']!r} "
+                f"(ids {seen[key]} and {b.get('id')})"
+            )
+            seen[key] = str(b.get("id"))
+
+
+def test_build_named_for_a_detachment_actually_runs_it(data):
+    """A build whose whole name IS a detachment must field that detachment.
+
+    Not a threshold — an identity check. If the name and the mix disagree about
+    something this basic, one of them is wrong.
+    """
+    for faction, builds in data["factionBuilds"].items():
+        for b in builds:
+            name = (b.get("name") or "").strip().lower()
+            mix = {(m.get("name") or "").lower(): m.get("pct", 0.0)
+                   for m in (b.get("detachmentMixFull") or [])}
+            if name in mix:
+                assert mix[name] > 0, (
+                    f"{faction}/{b['name']}: named after a detachment its own "
+                    f"full-pool mix records at 0%"
+                )
