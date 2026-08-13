@@ -438,8 +438,14 @@ const Predictor = () => {
           const verdict = verdictBucket(cell.winRate);
           const conf = confidenceLabel(cell.n, cell.source);
           const wrPct = Math.round(cell.winRate * 100);
+          // vpMargin is null on pooled-prior cells — pairs the model predicts
+          // but nobody has actually played. Calling .toFixed on that throws and
+          // takes the whole panel down, so treat "no observation" as a real
+          // state rather than assuming every cell was measured.
           const vp = cell.vpMargin;
-          const vpStr = `${vp >= 0 ? '+' : ''}${vp.toFixed(1)}`;
+          const vpStr = (typeof vp === 'number' && Number.isFinite(vp))
+            ? `${vp >= 0 ? '+' : ''}${vp.toFixed(1)}`
+            : '—';
 
           // LightGBM second-opinion lookup. The matrix is keyed by
           // build_id strings; null when the pipeline ran without the
