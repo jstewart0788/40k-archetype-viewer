@@ -49,7 +49,16 @@ LEGACY_TABLES = (
     "wh_keywords",
     "wh_wargear",
     "wh_models",
-    "wh_stratagems",
+    # wh_stratagems was here until migration 030 gave it an `edition` column.
+    # It belonged: every row was 10th-edition, and because detachment NAMES
+    # recur across editions, joining stratagems to 11e detachments by name
+    # silently returned 10e rules — which is exactly what this guard exists to
+    # catch. It is now edition-scoped, so it is no longer a legacy table, on the
+    # same footing as wh_enhancements (scoped since 017) which was never listed.
+    #
+    # Note the guard cannot enforce that a reader FILTERS on edition; it only
+    # flags tables where filtering is impossible. Queries against wh_stratagems
+    # must constrain edition themselves.
 )
 
 # (path suffix, table) -> why this read is legitimate.
