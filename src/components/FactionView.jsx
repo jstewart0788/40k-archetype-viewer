@@ -192,11 +192,33 @@ function OffMetaListCard({ ex }) {
                 {(sec.units || []).map((u, uIdx) => (
                   <li key={uIdx} className="text-[12px]">
                     <div className="flex justify-between items-baseline gap-2">
-                      <span className="text-slate-200 font-medium">{u.name}</span>
+                      <span className="text-slate-200 font-medium">
+                        {u.name}
+                        {/* A unit can carry a Leader AND a Support character at
+                            once, which is legal and reads as "two leaders"
+                            without this label. */}
+                        {u.attachedAs && (
+                          <span className={
+                            'ml-1.5 align-middle text-[9px] uppercase tracking-wide px-1 py-px rounded ' +
+                            (u.attachedAs === 'Leader'
+                              ? 'bg-amber-500/15 text-amber-300'
+                              : u.attachedAs === 'Support'
+                                ? 'bg-sky-500/15 text-sky-300'
+                                : 'bg-slate-600/30 text-slate-400')
+                          }>{u.attachedAs}</span>
+                        )}
+                      </span>
                       {u.points != null && <span className="text-slate-400 font-mono shrink-0">{u.points} pts</span>}
                     </div>
                     {u.modelRows?.length > 0 ? (
                       <ul className="pl-3 mt-1 space-y-0.5">
+                        {/* Total models, so a 10-strong squad is not mistaken for
+                            a single one when it is split across equipment rows. */}
+                        {u.modelRows.length > 1 && (
+                          <li className="text-[10px] text-slate-500 leading-relaxed">
+                            {u.modelRows.reduce((n, r) => n + (r.count || 0), 0)} models
+                          </li>
+                        )}
                         {u.modelRows.map((r, rIdx) => (
                           <li key={rIdx} className="text-[11px] leading-relaxed">
                             <span className="text-slate-300 font-medium">{r.count}× {r.name}</span>
