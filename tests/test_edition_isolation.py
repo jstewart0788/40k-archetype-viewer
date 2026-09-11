@@ -92,6 +92,14 @@ ALLOWED: dict[tuple[str, str], str] = {
     ("db/migrations/028_faction_aware_datasheet_resolution.sql", "wh_datasheets"):
         "Same alias hop, now centralised in mv_datasheet_resolution so it "
         "exists in exactly one place instead of once per resolution site.",
+    ("db/migrations/039_legends_and_rename_resolution.sql", "wh_datasheets"):
+        "039 rebuilds the same view and carries 028's alias tier forward "
+        "verbatim, so it inherits that hop unchanged — this is not a new read. "
+        "It is also the reason 039 adds a separate wh_datasheet_renames table "
+        "rather than extending wh_unit_aliases: the alias FK points at 10e "
+        "datasheet ids, so an 11e-only new name such as 'rukkatrukk "
+        "squigbuggies' has no 10e row to hop through and cannot be expressed "
+        "there at all.",
 }
 
 # The legacy importer owns these tables and must reference them. Its filename
