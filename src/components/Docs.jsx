@@ -365,10 +365,10 @@ const Docs = () => {
               </p>
               <BlockMath math="\theta_p \sim \mathcal{N}(0, \sigma_{\text{skill}}^2),\quad \beta_f \sim \mathcal{N}(0, \sigma_{\text{faction}}^2),\quad \sigma_{\text{skill}}, \sigma_{\text{faction}} \sim \text{HalfNormal}(1.0)" />
               <p>
-                Fit with NUTS, 2 chains × 1,000 warmup + 1,000 samples. Latest run diagnostics: <code>max R̂ = 1.015</code>, <code>min ESS = 166</code>, <code>0 divergences</code>. The posterior σ ratio <InlineMath math="\sigma_{\text{skill}} / \sigma_{\text{faction}} \approx 8.1" /> says player skill explains roughly 8× more variance than faction choice — most of who wins is who's playing.
+                Fit with NUTS, 2 chains × 1,000 warmup + 1,000 samples, over 40,728 eligible games and 16,357 players. Latest run diagnostics: <code>max R̂ = 1.007</code>, <code>min ESS = 298</code>, <code>0 divergences</code>. The posterior σ ratio <InlineMath math="\sigma_{\text{skill}} / \sigma_{\text{faction}} \approx 5.2" /> (90% CI 4.1–6.5) says player skill explains roughly 5× more variance than faction choice — most of who wins is who's playing. That ratio was ≈8 on a smaller corpus: <InlineMath math="\sigma_{\text{skill}}" /> has barely moved (1.67, 90% CI 1.61–1.73) while <InlineMath math="\sigma_{\text{faction}}" /> rose to 0.33 (90% CI 0.26–0.41) as more 11th-edition games made the spread between factions measurable. The gap narrowed because faction became better estimated, not because skill matters less.
               </p>
               <p className="mt-3">
-                For per-game weighting in matchup aggregation, we use a simpler time-aware Elo as a leak-free per-event snapshot of the player's strength. The full Bayesian posterior backs the win-rate adjustment on faction- and build-level numbers.
+                Every skill adjustment on this site — matchup weighting, and the faction- and build-level win rates — uses the time-aware Elo, not this posterior. The Elo is a <em>pre-event</em> snapshot computed only from a player's earlier games, so it cannot be informed by the result it is adjusting. The Bayesian posterior above is fit over the whole corpus at once, which makes it the better description of how skill and faction divide the variance, and the wrong instrument for adjusting an individual number: a player who won with a strong build earns a high posterior skill that would then explain that build's success away. It is reported here, not applied.
               </p>
             </Section>
 
