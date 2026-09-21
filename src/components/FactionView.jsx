@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend, Tooltip } from 'recharts';
@@ -320,7 +320,51 @@ const FactionView = () => {
   }
 
   const factionRatingsRow = factionRatings[selectedFaction] || {};
-  const builds = factionBuilds[selectedFaction] || [];
+  const builds = useMemo(
+    () => factionBuilds[selectedFaction] || [],
+    [factionBuilds, selectedFaction],
+  );
+  // What separates this build from the one it most resembles.
+  //
+  // Two builds of a faction share most of their roster — the faction's staples
+  // are in both by definition — so the card's Core line, which lists the four
+  // most common units, is frequently identical between neighbours. The units
+  // that actually differ can be 0% against 100% and were visible only inside
+  // the unit tab, one build at a time. This is the answer to "why are these two
+  // builds, not one": it names the models you would have to buy.
+  const siblingDiffs = useMemo(() => {
+    const pct = (b) => {
+      const m = new Map();
+      for (const u of b.unitFrequency || []) m.set(u.datasheet, u.pct || 0);
+      return m;
+    };
+    const vecs = builds.map(pct);
+    const out = {};
+    builds.forEach((b, i) => {
+      let best = null;
+      builds.forEach((other, j) => {
+        if (i === j) return;
+        const keys = new Set([...vecs[i].keys(), ...vecs[j].keys()]);
+        let dot = 0, na = 0, nb = 0;
+        keys.forEach((k) => {
+          const a = vecs[i].get(k) || 0, c = vecs[j].get(k) || 0;
+          dot += a * c; na += a * a; nb += c * c;
+        });
+        const sim = na && nb ? dot / Math.sqrt(na * nb) : 0;
+        if (!best || sim > best.sim) best = { sim, j };
+      });
+      if (!best || best.sim < 0.85) return;   // only claim a sibling when it is one
+      const other = builds[best.j];
+      const keys = new Set([...vecs[i].keys(), ...vecs[best.j].keys()]);
+      const diffs = [...keys]
+        .map((k) => ({ unit: k, mine: vecs[i].get(k) || 0, theirs: vecs[best.j].get(k) || 0 }))
+        .filter((d) => Math.abs(d.mine - d.theirs) >= 0.25)
+        .sort((x, y) => Math.abs(y.mine - y.theirs) - Math.abs(x.mine - x.theirs))
+        .slice(0, 3);
+      if (diffs.length) out[b.id] = { name: other.name, diffs };
+    });
+    return out;
+  }, [builds]);
   const offMetaLists = (unassignedWinningLists && unassignedWinningLists[selectedFaction]) || [];
   const factionDetachments = (detachmentViews && detachmentViews[selectedFaction]) || [];
   const factionListPool = (detachmentListPool && detachmentListPool[selectedFaction]) || {};
@@ -936,6 +980,20 @@ const FactionView = () => {
                       {wrPct != null && (
                         <div className="shrink-0 flex flex-col items-end gap-0.5">
                           <div className={`text-2xl font-bold leading-none ${wrColor}`}>{wrPct}%</div>
+                          {/* The interval, not just the point. Most builds'
+                              intervals overlap 50%: 304 of 342 on the 2026-09-10
+                              artifact, median width 18.7 pp. Printing 46.5% next
+                              to 52.2% with nothing else reads as a settled gap
+                              between two builds when the data cannot tell them
+                              apart. */}
+                          {build.winRateCiLo != null && build.winRateCiHi != null && (
+                            <div
+                              className="text-[10px] text-slate-500 leading-none"
+                              title={`95% interval, ${build.nGames} games. Overlapping intervals mean the difference is not resolved by this sample.`}
+                            >
+                              {(build.winRateCiLo * 100).toFixed(0)}–{(build.winRateCiHi * 100).toFixed(0)}%
+                            </div>
+                          )}
                           {/* 6-month raw monthly WR sparkline. Tells the user
                               whether this build is winning more (or less) than
                               it used to, distinct from the adoption-momentum
@@ -995,6 +1053,21 @@ const FactionView = () => {
                             {i > 0 && <span className="text-slate-600">, </span>}
                             <span className="text-slate-300">{d.name}</span>
                             <span className="text-slate-500"> {Math.round(d.pct * 100)}%</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {siblingDiffs[build.id] && (
+                      <div className="text-xs text-slate-400 leading-relaxed mt-1">
+                        <span className="text-slate-500">vs {siblingDiffs[build.id].name}: </span>
+                        {siblingDiffs[build.id].diffs.map((d, i) => (
+                          <span key={d.unit}>
+                            {i > 0 && <span className="text-slate-600">, </span>}
+                            <span className="text-slate-300">{d.unit}</span>
+                            <span className="text-slate-500">
+                              {' '}{Math.round(d.mine * 100)}% vs {Math.round(d.theirs * 100)}%
+                            </span>
                           </span>
                         ))}
                       </div>
