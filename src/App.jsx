@@ -1,11 +1,12 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { TournamentDataProvider } from './data/TournamentDataContext'
 import Navigation from './components/Navigation'
 import FactionView from './components/FactionView'
 import ArchetypeDetail from './components/ArchetypeDetail'
 import MatchupExplorer from './components/MatchupExplorer'
 import Predictor from './components/Predictor'
+import ShareCard from './components/ShareCard'
 import { SHOW_PLAYSTYLE, SHOW_MATCHUP_EXPLORER, SHOW_PREDICTOR } from './featureFlags'
 
 // Docs is lazy-loaded so KaTeX (~350 KB) and the long-form copy don't
@@ -38,6 +39,13 @@ const DocsFallback = (
   </div>
 )
 
+/** Site chrome, minus the one route that must render as a bare image. */
+function Chrome() {
+  const { pathname } = useLocation()
+  if (pathname.endsWith('/og-card')) return null
+  return <Navigation />
+}
+
 function App() {
   return (
     <Router basename="/40k-archetype-viewer">
@@ -59,7 +67,7 @@ function App() {
       />
       <TournamentDataProvider>
         <div className="min-h-screen relative">
-          <Navigation />
+          <Chrome />
           <Routes>
             <Route path="/" element={<FactionView />} />
             {/* Early-edition mode: deeper-analysis pages are hidden and any old
@@ -67,6 +75,12 @@ function App() {
             <Route path="/archetypes" element={SHOW_PLAYSTYLE ? <ArchetypeDetail /> : <Navigate to="/" replace />} />
             <Route path="/matchups" element={SHOW_MATCHUP_EXPLORER ? <MatchupExplorer /> : <Navigate to="/" replace />} />
             <Route path="/predict" element={SHOW_PREDICTOR ? <Predictor /> : <Navigate to="/" replace />} />
+            {/* Off-menu: the 1200x630 card the weekly refresh screenshots into
+                public/og.png for link previews. Rendering it as a real route
+                means the shared image is made from the same data the site
+                serves, rather than from a second chart implementation that
+                drifts. Nothing links here. */}
+            <Route path="/og-card" element={<ShareCard />} />
             <Route path="/docs"  element={<Suspense fallback={DocsFallback}><Docs /></Suspense>} />
             {/* /about kept as a soft redirect for any old bookmarks */}
             <Route path="/about" element={<Suspense fallback={DocsFallback}><Docs /></Suspense>} />

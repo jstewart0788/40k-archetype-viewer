@@ -43,6 +43,9 @@ export function TournamentDataProvider({ children }) {
       // without the trained model. Predictor checks for null and
       // falls back to EB-cell-only.
       lgbmBvbMatrix:         raw.lgbmBvbMatrix || null,
+      // Weekly series + snapshot windows per faction. Absent from artifacts
+      // built before 2026-09-22, so every consumer must tolerate {}.
+      factionTrends:         raw.factionTrends || {},
       integratedFactionRatings: mergeFactionRatings(raw),
       dataMetadata:          getDataMetadata(raw),
     };

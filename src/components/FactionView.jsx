@@ -7,8 +7,9 @@ import { archetypes } from '../data/dataIntegration';
 import { useTournamentData } from '../data/TournamentDataContext';
 import { wrColor as wrColorBucket } from '../data/winRateColor';
 import { ciAroundAdjusted } from '../data/winRateStats';
-import { SHOW_PLAYSTYLE } from '../featureFlags';
+import { SHOW_PLAYSTYLE, SHOW_MATCHUP_EXPLORER, SHOW_PREDICTOR } from '../featureFlags';
 import ArchetypeTooltip from './ArchetypeTooltip';
+import FactionOverview from './FactionOverview';
 import InfoPopover from './InfoPopover';
 import Sparkline from './Sparkline';
 
@@ -260,7 +261,7 @@ function OffMetaListCard({ ex }) {
 }
 
 const FactionView = () => {
-  const { integratedFactionRatings: factionRatings, factionBuilds, unassignedWinningLists, detachmentViews, detachmentListPool, dataMetadata } = useTournamentData();
+  const { integratedFactionRatings: factionRatings, factionBuilds, unassignedWinningLists, detachmentViews, detachmentListPool, dataMetadata, factionTrends } = useTournamentData();
   const [searchParams] = useSearchParams();
 
   // Hydrate from URL params first (search palette, deep link, share),
@@ -273,10 +274,15 @@ const FactionView = () => {
       const saved = window.localStorage?.getItem(LAST_FACTION_KEY);
       if (saved && factions.includes(saved)) return saved;
     } catch { /* localStorage unavailable, e.g. SSR or strict privacy mode */ }
-    return factions[0];
+    // Nothing selected on a first visit. The overview above answers "how is
+    // every faction doing" without a choice being made first; picking one is
+    // the second step, not the price of admission. A returning visitor still
+    // lands on their own faction via localStorage above.
+    return null;
   });
   // Persist on change so the next visit hydrates with it.
   useEffect(() => {
+    if (!selectedFaction) return;   // never persist the empty first-visit state
     try { window.localStorage?.setItem(LAST_FACTION_KEY, selectedFaction); } catch { /* noop */ }
   }, [selectedFaction]);
   const [selectedBuild, setSelectedBuild] = useState(() => {
@@ -473,7 +479,7 @@ const FactionView = () => {
               Nachmund
             </h1>
             <p className="text-slate-200 text-lg max-w-2xl mx-auto" style={{ textShadow: '0 1px 8px rgba(0, 0, 0, 0.9)' }}>
-              Pick your faction (or your opponent's) below to see what's winning right now and which builds are rising. Or jump to the <Link to="/predict" className="underline decoration-dotted underline-offset-2 hover:text-purple-300">Predictor</Link> to compare two specific lists.
+              How every faction is doing right now, and the builds people are actually winning with.
             </p>
             <p className="text-slate-400 text-sm max-w-2xl mx-auto mt-2" style={{ textShadow: '0 1px 8px rgba(0, 0, 0, 0.9)' }}>
               Built from {dataMetadata.gamesCount?.toLocaleString() || 'tournament'} games over {dataMetadata.dateRange || 'the last 6 months'}, skill-adjusted and time-weighted toward current meta.
@@ -487,10 +493,19 @@ const FactionView = () => {
             )}
           </div>
 
+          {/* Every faction at a glance, before any choice is made. */}
+          <FactionOverview
+            factionRatings={factionRatings}
+            factionTrends={factionTrends}
+            detachmentViews={detachmentViews}
+            dataMetadata={dataMetadata}
+            onSelectFaction={(f) => { setSelectedFaction(f); setSelectedBuild(null); setBuildTab('description'); }}
+          />
+
           {/* Faction picker — wrap-grid on tablet+, native <select> on phone */}
           <div className="max-w-5xl mx-auto">
             <h2 className="text-2xl font-semibold text-white mb-4 text-center" style={{ textShadow: '0 1px 8px rgba(0, 0, 0, 0.9)' }}>
-              Select a Faction
+              Or select a faction for a detailed breakdown
             </h2>
 
             {/* Mobile: native select — tap-friendly, no 1600px wall of buttons */}
@@ -531,7 +546,17 @@ const FactionView = () => {
 
       <div className="relative container mx-auto px-6 pb-8 pt-8 max-w-7xl">
 
-        {/* Faction name (always shown). */}
+        {/* Nothing below here means anything without a faction. On a first
+            visit the overview above has already answered the general question,
+            so the page simply ends rather than guessing a faction for the
+            reader. */}
+        {!selectedFaction && (
+          <p className="text-center text-slate-500 text-sm">
+            Pick a faction above for its builds, the lists that won with them, and every detachment.
+          </p>
+        )}
+        {selectedFaction && (<>
+
         <h2 className="text-3xl font-bold text-white text-center mb-6">{displayFactionName(selectedFaction)}</h2>
 
         {/* Headline (list-composition flags + playstyle archetype ratings) —
@@ -1155,21 +1180,30 @@ const FactionView = () => {
                           </span>
                         )}
                       </div>
-                      {/* Cross-page jumps — golden paths #2 and #4. */}
+                      {/* The matchup explorer and the predictor are switched
+                          off in early-edition mode (src/featureFlags.js), and
+                          App.jsx redirects both routes home — so links to them
+                          were dead. They come back with the flags. */}
+                      {(SHOW_MATCHUP_EXPLORER || SHOW_PREDICTOR) && (
                       <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-800">
+                        {SHOW_MATCHUP_EXPLORER && (
                         <Link
                           to={`/matchups?faction=${encodeURIComponent(selectedFaction)}&build=${selectedBuildObj.id}`}
                           className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 text-sm"
                         >
                           See matchups for this build →
                         </Link>
+                        )}
+                        {SHOW_PREDICTOR && (
                         <Link
                           to={`/predict?factionA=${encodeURIComponent(selectedFaction)}&buildA=${selectedBuildObj.id}`}
                           className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 text-sm"
                         >
                           Use as "You" in Predictor →
                         </Link>
+                        )}
                       </div>
+                      )}
                     </div>
                   )}
 
@@ -1670,6 +1704,7 @@ const FactionView = () => {
           </div>
         )}
 
+        </>)}
       </div>
     </div>
   );
