@@ -28,7 +28,7 @@ const pct = (v, dp = 1) => (v == null ? '—' : `${(v * 100).toFixed(dp)}%`);
 const posPct = (v) => `${(((Math.min(AXIS_HI, Math.max(AXIS_LO, v)) - AXIS_LO) / (AXIS_HI - AXIS_LO)) * 100).toFixed(2)}%`;
 
 /** One faction or detachment row: name, interval, dot, numbers. */
-function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children }) {
+function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children, muted, valueTitle }) {
   const c = wrColor(wr);
   return (
     <div
@@ -53,14 +53,22 @@ function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children }) {
           />
         )}
         {wr != null && (
+          // Hollow when the dot is NOT last week's figure — a faction with too
+          // few games in the window still has a position worth seeing, but it
+          // must not read as the same measurement as the solid dots.
           <div
             className="absolute top-1/2 w-2.5 h-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full ring-2 ring-slate-800"
-            style={{ left: posPct(wr), backgroundColor: c.hex }}
+            style={muted
+              ? { left: posPct(wr), backgroundColor: 'transparent', boxShadow: `inset 0 0 0 2px ${c.hex}` }
+              : { left: posPct(wr), backgroundColor: c.hex }}
           />
         )}
       </div>
 
-      <span className={`tabular-nums text-[12px] font-semibold text-right ${c.text}`}>{pct(wr)}</span>
+      <span className={`tabular-nums text-[12px] font-semibold text-right ${muted ? 'text-slate-600' : c.text}`}
+            title={valueTitle}>
+        {muted ? '—' : pct(wr)}
+      </span>
       {sub}
     </div>
   );
@@ -75,8 +83,8 @@ function MoveChip({ move }) {
   const down = move.direction === 'down';
   const tone = up ? 'text-emerald-400' : down ? 'text-rose-400' : 'text-slate-500';
   const title = up || down
-    ? `Last 28 days vs the 56 before: ${move.delta > 0 ? '+' : ''}${(move.delta * 100).toFixed(1)} points (z=${move.z}). About 1 in 28 of these arrows is expected to be a false alarm.`
-    : `No movement this test can resolve (z=${move.z}).`;
+    ? `Last 7 days against the 7 before: ${move.delta > 0 ? '+' : ''}${(move.delta * 100).toFixed(1)} points (z=${move.z}). A week is a small sample, so even a flagged change is weak evidence.`
+    : `${move.delta != null ? `${move.delta > 0 ? '+' : ''}${(move.delta * 100).toFixed(1)} points against the previous week. ` : ''}Within what a week of games moves by chance.`;
   return (
     <span className={`text-[10px] tabular-nums text-right ${tone}`} title={title}>
       {up ? '▲' : down ? '▼' : '·'} {move.delta != null ? `${move.delta > 0 ? '+' : ''}${(move.delta * 100).toFixed(1)}` : ''}
@@ -105,7 +113,11 @@ function Snapshot({ w, label }) {
 }
 
 export default function FactionOverview({ factionRatings, factionTrends, detachmentViews, dataMetadata, onSelectFaction }) {
-  const [expanded, setExpanded] = useState(null);
+  // ONE selection, two ways in. Clicking a faction in the table and clicking it
+  // in the chart legend are the same act — expanding its detachments and
+  // bringing its line forward — so they share a state and either one closes
+  // what the other opened.
+  const [active, setActive] = useState(null);
   const trends = useMemo(() => factionTrends?.factions || {}, [factionTrends]);
   const meta = factionTrends?.meta;
 
@@ -122,19 +134,35 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         // happened to be piloting it.
         const wins = (r.winRateWins || 0) + 0.5 * (r.winRateDraws || 0);
         const n = games || 1;
-        const wr = r.rawWinRate != null ? r.rawWinRate : wins / n;
-        const p = wins / n;
-        const z = 1.96;
-        const denom = 1 + (z * z) / n;
-        const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom;
+        const edition = r.rawWinRate != null ? r.rawWinRate : wins / n;
+        // THE PLOT READS: where a faction is NOW (the dot, last 7 days) against
+        // where it has been since the last points update (the band). The two
+        // answer different questions and the row shows both at once — a dot
+        // outside its own band is a faction whose week departed from its form.
+        const lw = t.lastWeek && !t.lastWeek.belowFloor ? t.lastWeek : null;
+        const ds = t.sinceDataslate && !t.sinceDataslate.belowFloor ? t.sinceDataslate : null;
+        const wr = lw ? lw.winRate : (ds ? ds.winRate : edition);
         return {
-          faction, wr, games,
-          ciLo: Math.max(0, wr - half), ciHi: Math.min(1, wr + half),
-          lastWeek: t.lastWeek, sinceDataslate: t.sinceDataslate, move: t.move,
+          faction, wr, games, edition, hasWeek: !!lw,
+          // Band: the spread the dataslate window supports, so the dot is read
+          // against this edition's current rules rather than the whole corpus.
+          ciLo: ds ? ds.ciLo : null,
+          ciHi: ds ? ds.ciHi : null,
+          bandLabel: ds ? 'since the points update' : null,
+          lastWeek: t.lastWeek, sinceDataslate: t.sinceDataslate,
+          move: t.move, weekMove: t.weekMove,
           series: (t.wr || []).map((v, i) => ({ winRate: v, n: (t.n || [])[i] })),
         };
       })
-      .sort((a, b) => (b.wr ?? 0) - (a.wr ?? 0));
+      // Sorted on the last seven days: the question this section opens with is
+      // what is winning NOW. Factions whose week is too thin to report sort to
+      // the bottom rather than being ranked on a number that is not shown.
+      .sort((a, b) => {
+        const av = a.lastWeek && !a.lastWeek.belowFloor ? a.lastWeek.winRate : -1;
+        const bv = b.lastWeek && !b.lastWeek.belowFloor ? b.lastWeek.winRate : -1;
+        if (av !== bv) return bv - av;
+        return (b.edition ?? 0) - (a.edition ?? 0);
+      });
   }, [factionRatings, trends]);
 
   // All factions on one time chart, as the owner asked. Readability comes from
@@ -150,7 +178,8 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
   }, [meta, rows]);
 
   const [hovered, setHovered] = useState(null);
-  const focus = expanded || hovered;
+  const [showLegend, setShowLegend] = useState(false);
+  const focus = hovered || active;
 
   if (!rows.length) return null;
 
@@ -163,10 +192,9 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         </span>
       </div>
       <p className="text-[12px] text-slate-400 mb-1 leading-relaxed">
-        Each dot is a faction&rsquo;s win rate across {' '}
-        {dataMetadata?.gamesCount?.toLocaleString?.() || 'these'} games. The bar through it is the
-        margin of error at 95%. Where two bars overlap, the gap between those factions is smaller
-        than that margin.
+        The dot is a faction&rsquo;s win rate over the last 7 days. The bar behind it is its range
+        since the last points update, at 95% — where two bars overlap, the gap between those
+        factions is smaller than the margin of error. Sorted by the last 7 days.
       </p>
       <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
         Games won, counting a draw as half a win. Not adjusted for who was playing.
@@ -175,21 +203,22 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
       <div className={`${GRID} text-[10px] uppercase tracking-wide text-slate-500 pb-1 border-b border-slate-700/70`}>
         <div>Faction</div>
         <div className="hidden sm:flex justify-between"><span>{pct(AXIS_LO, 0)}</span><span>50%</span><span>{pct(AXIS_HI, 0)}</span></div>
-        <div className="text-right" title="Every 11th edition game in the data — the site holds no games from before the edition launched.">11th ed</div>
-        <div className="text-right">By week</div>
-        <div className="text-right" title="Win rate over the last 7 days of games. One weekend is a small sample, so expect it to jump around.">Last 7d</div>
-        <div className="text-right" title={meta?.dataslateFrom
-              ? `Win rate since the points update on ${meta.dataslateFrom}. It is a date range, not a claim about what the update did.`
-              : 'Since the last points update'}>
-          {meta?.dataslateFrom ? `Since ${new Date(meta.dataslateFrom + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : 'Since update'}
+        <div className="text-right" title="Win rate over the last 7 days of games — what the rows are sorted on.">Last 7d</div>
+        <div className="text-right"
+             title={meta?.dataslateFrom
+               ? `Win rate since the points update on ${meta.dataslateFrom}. A date range, not a claim about what the update did.`
+               : 'Since the last points update'}>
+          Since dataslate
         </div>
-        <div className="text-right" title="The last 28 days compared with the 56 days before them.">28d vs prev</div>
+        <div className="text-right" title="Every 11th edition game in the data — the site holds nothing from before the edition launched.">11th ed</div>
+        <div className="text-right" title="One point per week.">By week</div>
+        <div className="text-right" title="Last 7 days against the 7 before them.">vs prev wk</div>
         <div />
       </div>
 
       <div className="divide-y divide-slate-700/40">
         {rows.map((r) => {
-          const isOpen = expanded === r.faction;
+          const isOpen = active === r.faction;
           const dets = (detachmentViews?.[r.faction] || []).slice().sort((a, b) => (b.nGames || 0) - (a.nGames || 0));
           const detCount = dets.length;
           return (
@@ -199,13 +228,20 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
               <Row
                 label={r.faction}
                 wr={r.wr} ciLo={r.ciLo} ciHi={r.ciHi} games={r.games}
-                onClick={() => setExpanded(isOpen ? null : r.faction)}
+                muted={!r.hasWeek}
+                valueTitle={r.hasWeek
+                  ? `${(r.lastWeek.n || 0).toLocaleString()} games in the last 7 days`
+                  : `Too few games in the last 7 days to report (${r.lastWeek?.n ?? 0}). The hollow dot is this faction's rate since the last points update.`}
+                onClick={() => setActive(isOpen ? null : r.faction)}
                 sub={
                   <>
+                    <span className="text-right"><Snapshot w={r.sinceDataslate} label={`Since the points update${meta?.dataslateFrom ? ` on ${meta.dataslateFrom}` : ''}`} /></span>
+                    <span className="text-right tabular-nums text-[11px] text-slate-400"
+                          title={`${(r.games || 0).toLocaleString()} games this edition`}>
+                      {pct(r.edition, 0)}
+                    </span>
                     <span className="flex justify-end"><Sparkline data={r.series} accent={wrColor(r.wr).hex} width={52} height={14} /></span>
-                    <span className="text-right"><Snapshot w={r.lastWeek} label="Last 7 days" /></span>
-                    <span className="text-right"><Snapshot w={r.sinceDataslate} label={`Since ${meta?.dataslateFrom || 'the last points update'}`} /></span>
-                    <MoveChip move={r.move} />
+                    <MoveChip move={r.weekMove} />
                     {/* One big chevron that turns to point down when the row is
                         open. The count-in-a-box version read as data rather
                         than as a control. */}
@@ -272,9 +308,9 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
             covers every game since the last points update.{' '}
           </>
         )}
-        <strong className="text-slate-400">28d vs prev</strong> compares the last four weeks with the
-        eight before them; an arrow appears only when the change is larger than the sample can
-        explain on its own, and roughly one arrow in 28 will still be a false alarm.
+        <strong className="text-slate-400">vs prev wk</strong> is the change from the week before.
+        A week is a small sample, so most of this column is the sample moving rather than the game
+        changing — an arrow appears only where the two weeks separate beyond that, which is rare.
       </p>
 
       {timeData.length > 1 && (
@@ -282,7 +318,7 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
           <div className="flex items-baseline justify-between mb-1">
             <h3 className="text-sm font-semibold text-slate-200">Week by week</h3>
             <span className="text-[10px] text-slate-500">
-              {focus ? focus : 'hover a faction above to bring its line forward'}
+              {focus ? focus : 'hover or click a faction to bring its line forward'}
             </span>
           </div>
           <p className="text-[10px] text-slate-500 mb-2">
@@ -336,6 +372,37 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
               </LineChart>
             </ResponsiveContainer>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowLegend((v) => !v)}
+            className="mt-2 text-[11px] text-slate-400 hover:text-purple-200 underline decoration-dotted underline-offset-2"
+          >
+            {showLegend ? 'Hide legend' : 'Show legend'}
+          </button>
+
+          {showLegend && (
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              {rows.map((r) => {
+                const on = active === r.faction;
+                return (
+                  <button
+                    key={r.faction}
+                    type="button"
+                    onClick={() => setActive(on ? null : r.faction)}
+                    className={`inline-flex items-center gap-1.5 text-[11px] rounded px-1 py-0.5 transition-colors ${
+                      on ? 'bg-slate-700/60 text-slate-100' : 'text-slate-400 hover:text-slate-100'
+                    }`}
+                    title={on ? `Hide ${r.faction}` : `Bring ${r.faction} forward and open its detachments`}
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: on ? wrColor(r.wr).hex : '#64748b' }} />
+                    {r.faction}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
