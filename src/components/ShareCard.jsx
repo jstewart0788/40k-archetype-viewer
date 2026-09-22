@@ -89,7 +89,7 @@ export default function ShareCard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                     borderTop: '1px solid #1e293b', paddingTop: 10, marginTop: 6 }}>
         <div style={{ fontSize: 17, color: '#64748b' }}>
-          Margin of error runs ±1 to ±5 points. Factions next to each other are not separated by this data.
+          Margin of error runs ±1 to ±5 points, so gaps smaller than that are within the sample's noise.
         </div>
         {/* Typeable, not just clickable: the image gets screenshotted and
             re-posted without the link attached. */}

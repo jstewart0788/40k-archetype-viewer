@@ -163,9 +163,10 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         </span>
       </div>
       <p className="text-[12px] text-slate-400 mb-1 leading-relaxed">
-        Each dot is a faction&rsquo;s win rate. The bar through it is how precisely {' '}
-        {dataMetadata?.gamesCount?.toLocaleString?.() || 'these'} games can pin that number down —
-        where two bars overlap, the data cannot say which faction is better.
+        Each dot is a faction&rsquo;s win rate across {' '}
+        {dataMetadata?.gamesCount?.toLocaleString?.() || 'these'} games. The bar through it is the
+        margin of error at 95%. Where two bars overlap, the gap between those factions is smaller
+        than that margin.
       </p>
       <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
         Games won, counting a draw as half a win. Not adjusted for who was playing.
