@@ -1,31 +1,25 @@
 # Nachmund
 
-Interactive meta-analysis tool for Warhammer 40,000 (10th edition) army lists. Built on real tournament data — visualizes per-faction archetype strengths, surfaces named list builds (NMF clusters), and predicts matchup outcomes.
+Interactive meta-analysis tool for Warhammer 40,000 (11th edition) army lists. Built on real tournament data — surfaces the builds each faction is actually winning with, what they field, and how often they win.
 
 ## Features
 
 ### Faction view (`/`)
-- Faction selector with all 22 playable factions
-- Radar chart of archetype strengths across an 8-axis playstyle taxonomy
-- Common Builds: NMF-derived list clusters with example lists, win rates, unit frequency
-- Color-coded ratings:
-  - 🟢 8–10: Core Strength
-  - 🟡 5–7: Viable Hybrid
-  - 🔴 0–4: Weak Fit
+- All 28 playable factions, including the six Space Marine chapters tracked separately
+- Common Builds: clusters of lists that field the same army, each with its win rate and
+  95% interval, the units it runs and how often, its detachments, and example lists
+- Each build names what separates it from the build it most resembles, so two similar
+  cards can be told apart without opening them
+- Unit frequency, enhancements and detachment mix per build
 
-### Archetype guide (`/archetypes`)
-- Definitions, strengths, and weaknesses for each playstyle archetype
-- Live matchup data per archetype with tactical notes
-- Top factions per archetype
+### Docs (`/docs`)
+- How a build is derived, what the win rate does and does not account for, and the
+  limits of the sample
 
-### Matchup explorer (`/matchups`)
-- Drill down by faction × build to see matchup data vs each opponent playstyle
-- Empirical-Bayes shrinkage for thin matchup cells
-
-### Predictor (`/predict`)
-- Pick two faction builds, get win probability and VP margin
-- Backed by a LightGBM matchup model trained on real games
-- Recent matchups saved to `localStorage`
+### Early-edition mode
+The playstyle radar, the matchup explorer and the build-vs-build predictor are built
+but hidden while the edition is young and the sample is thin — see `src/featureFlags.js`.
+They come back when the data supports them.
 
 ## Tech stack
 
@@ -33,7 +27,7 @@ Interactive meta-analysis tool for Warhammer 40,000 (10th edition) army lists. B
 - **React Router** for routing
 - **Recharts** for visualizations
 - **PostgreSQL** + **dbt** + **Python** for the upstream pipeline (private)
-- **LightGBM** for matchup prediction
+- **LightGBM** for matchup prediction (built, currently hidden)
 - **scikit-learn** NMF for cluster extraction
 - **gh-pages** for deployment
 
@@ -74,7 +68,7 @@ The data pipeline that ingests tournament results, runs the rating model, and bu
 │   │   ├── FactionView.jsx       # Faction view + radar + Common Builds
 │   │   ├── ArchetypeDetail.jsx   # Archetype guide
 │   │   ├── MatchupExplorer.jsx   # Build × opponent matchup explorer
-│   │   ├── Predictor.jsx         # Build-vs-build predictor
+│   │   ├── Predictor.jsx         # Build-vs-build predictor (hidden)
 │   │   └── Navigation.jsx        # Top-level navigation
 │   ├── data/
 │   │   ├── archetypeData.js      # Archetype definitions + manual fallback

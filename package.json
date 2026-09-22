@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Nachmund — Warhammer 40K (10th edition) tournament meta analysis. Faction archetype radars, build clusters, matchup explorer, and predictor.",
+  "description": "Nachmund — Warhammer 40K (11th edition) tournament meta analysis. Faction build clusters with win rates, unit frequency and detachment mix.",
   "author": "Jonathan Stewart",
   "license": "MIT",
   "engines": {
