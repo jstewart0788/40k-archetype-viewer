@@ -21,7 +21,13 @@ const pos = (v) => ((Math.min(AXIS_HI, Math.max(AXIS_LO, v)) - AXIS_LO) / (AXIS_
 export default function ShareCard() {
   const { integratedFactionRatings: ratings, dataMetadata } = useTournamentData();
   const rows = Object.entries(ratings || {})
-    .map(([faction, r]) => ({ faction, wr: r.winRate, games: r.games || 0 }))
+    // Raw rate, matching the chart on the page. A shared picture travels
+    // without its footnotes, so the number on it has to be the plain one.
+    .map(([faction, r]) => ({
+      faction,
+      wr: r.rawWinRate != null ? r.rawWinRate : r.winRate,
+      games: r.games || 0,
+    }))
     .sort((a, b) => (b.wr ?? 0) - (a.wr ?? 0));
   const half = Math.ceil(rows.length / 2);
   const columns = [rows.slice(0, half), rows.slice(half)];
@@ -46,7 +52,7 @@ export default function ShareCard() {
       </div>
 
       <div style={{ fontSize: 23, color: '#cbd5e1', marginTop: 4, marginBottom: 10 }}>
-        Skill-adjusted win rate by faction
+        Win rate by faction
         <span style={{ color: '#64748b', fontSize: 19 }}>
           {'  ·  '}{dataMetadata?.gamesCount?.toLocaleString?.()} games{'  ·  '}{dataMetadata?.dateRange}
         </span>

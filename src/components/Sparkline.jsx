@@ -32,7 +32,17 @@ const Sparkline = ({ data, width = 64, height = 18, accent = '#34d399' }) => {
   const innerH = height - padY * 2;
   const xFor = (i) =>
     lastN === 1 ? width / 2 : padX + (i / (lastN - 1)) * innerW;
-  const yFor = (wr) => padY + (1 - wr) * innerH; // wr=1 → top
+  // Scaled 30–70%, not 0–100%. A win rate that moves from 48% to 54% is a
+  // large move in this game and was three pixels of a full-height axis, so
+  // every sparkline on the site drew the same flat line. Values outside the
+  // band clamp to the edge rather than rescaling it: a single freak week would
+  // otherwise squash every other point back into a line.
+  const Y_LO = 0.30;
+  const Y_HI = 0.70;
+  const yFor = (wr) => {
+    const c = Math.min(Y_HI, Math.max(Y_LO, wr));
+    return padY + (1 - (c - Y_LO) / (Y_HI - Y_LO)) * innerH;
+  };
 
   const points = validPoints.map((p) => ({
     x: xFor(p.i),
@@ -56,7 +66,7 @@ const Sparkline = ({ data, width = 64, height = 18, accent = '#34d399' }) => {
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label="Win rate trend over the last 6 months"
+      aria-label="Win rate trend, scaled 30% to 70%"
       style={{ overflow: 'visible' }}
     >
       {/* 50% reference line */}

@@ -115,18 +115,20 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         const games = r.games || 0;
         // Interval from the record: the same Wilson width the build cards use,
         // recentred on the skill-adjusted rate.
+        // RAW win rate: games won, draws as a half. The site's headline
+        // elsewhere is skill-adjusted, but this chart answers "what happened",
+        // and the adjustment quietly rewrites a faction's record by who
+        // happened to be piloting it.
         const wins = (r.winRateWins || 0) + 0.5 * (r.winRateDraws || 0);
         const n = games || 1;
+        const wr = r.rawWinRate != null ? r.rawWinRate : wins / n;
         const p = wins / n;
         const z = 1.96;
         const denom = 1 + (z * z) / n;
-        const centre = (p + (z * z) / (2 * n)) / denom;
         const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom;
-        const wr = r.winRate;
         return {
           faction, wr, games,
           ciLo: Math.max(0, wr - half), ciHi: Math.min(1, wr + half),
-          centre,
           lastWeek: t.lastWeek, sinceDataslate: t.sinceDataslate, move: t.move,
           series: (t.wr || []).map((v, i) => ({ winRate: v, n: (t.n || [])[i] })),
         };
@@ -159,20 +161,29 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
           {dataMetadata?.gamesCount?.toLocaleString?.()} games · {dataMetadata?.dateRange}
         </span>
       </div>
-      <p className="text-[11px] text-slate-400 mb-4">
-        Skill-adjusted win rate with its 95% range. Every neighbouring pair overlaps — read the ranges, not the order.
-        The headline leans recent (45-day half-life); the two columns on the right are plain windows.
+      <p className="text-[12px] text-slate-400 mb-1 leading-relaxed">
+        Each dot is a faction&rsquo;s win rate. The bar through it is how precisely {' '}
+        {dataMetadata?.gamesCount?.toLocaleString?.() || 'these'} games can pin that number down —
+        where two bars overlap, the data cannot say which faction is better.
+      </p>
+      <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+        Games won, counting a draw as half a win. Not adjusted for who was playing.
       </p>
 
       <div className="grid grid-cols-[minmax(0,9.5rem)_1fr_auto] gap-2 text-[10px] uppercase tracking-wide text-slate-500 pb-1 border-b border-slate-700/70">
         <div>Faction</div>
         <div className="hidden sm:flex justify-between"><span>{pct(AXIS_LO, 0)}</span><span>50%</span><span>{pct(AXIS_HI, 0)}</span></div>
         <div className="flex items-center gap-2 justify-end">
-          <span className="w-12 text-right">Overall</span>
-          <span className="w-[52px] text-right">Weekly</span>
-          <span className="w-8 text-right" title="Win rate over the last 7 days of data. A week is a small sample — read it as a snapshot, not a trend.">Week</span>
-          <span className="w-8 text-right" title={meta?.dataslateFrom ? `Win rate since the points update of ${meta.dataslateFrom}. A window, not a verdict on the update.` : 'Since the last points update'}>Slate</span>
-          <span className="w-12 text-right" title="Last 28 days against the 56 before them.">Move</span>
+          <span className="w-12 text-right">All time</span>
+          <span className="w-[52px] text-right">By week</span>
+          <span className="w-8 text-right" title="Win rate over the last 7 days of games. One weekend is a small sample, so expect it to jump around.">Last 7d</span>
+          <span className="w-8 text-right"
+                title={meta?.dataslateFrom
+                  ? `Win rate since the points update on ${meta.dataslateFrom}. It is a date range, not a claim about what the update did.`
+                  : 'Since the last points update'}>
+            {meta?.dataslateFrom ? `Since ${new Date(meta.dataslateFrom + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : 'Since update'}
+          </span>
+          <span className="w-12 text-right" title="The last 28 days compared with the 56 days before them.">28d vs prev</span>
           <span className="w-3" />
         </div>
       </div>
@@ -222,10 +233,11 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
                         const p = ((d.wins || 0) + 0.5 * (d.draws || 0)) / (n || 1);
                         const z = 1.96, denom = 1 + (z * z) / (n || 1);
                         const half = n ? (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom : null;
+                        const dwr = d.rawWinRate != null ? d.rawWinRate : p;
                         return (
-                          <Row key={d.name} dim label={d.name} wr={d.winRate}
-                               ciLo={half != null ? Math.max(0, d.winRate - half) : null}
-                               ciHi={half != null ? Math.min(1, d.winRate + half) : null}
+                          <Row key={d.name} dim label={d.name} wr={dwr}
+                               ciLo={half != null ? Math.max(0, dwr - half) : null}
+                               ciHi={half != null ? Math.min(1, dwr + half) : null}
                                games={n}
                                sub={<span className="text-[10px] text-slate-500 tabular-nums w-24 text-right">{n.toLocaleString()} games</span>} />
                         );
@@ -248,6 +260,23 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         })}
       </div>
 
+      <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
+        <strong className="text-slate-400">Last 7d</strong> is the most recent weekend of games —
+        a small sample, shown as a snapshot rather than a trend, and left blank when there are too
+        few games to mean anything.{' '}
+        {meta?.dataslateFrom && (
+          <>
+            <strong className="text-slate-400">
+              Since {new Date(meta.dataslateFrom + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}
+            </strong>{' '}
+            covers every game since the last points update.{' '}
+          </>
+        )}
+        <strong className="text-slate-400">28d vs prev</strong> compares the last four weeks with the
+        eight before them; an arrow appears only when the change is larger than the sample can
+        explain on its own, and roughly one arrow in 28 will still be a false alarm.
+      </p>
+
       {timeData.length > 1 && (
         <div className="mt-5 pt-4 border-t border-slate-700/70">
           <div className="flex items-baseline justify-between mb-1">
@@ -266,13 +295,12 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
                 <XAxis dataKey="bucket" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
                 {/* A wider band than the summary rows above: a single week's
                     win rate swings far more than a faction's season figure.
-                    Measured on this corpus, 96% of weekly points fall inside
-                    35–65% against 4% outside 40–60, so the narrower axis would
-                    rescale itself around a handful of thin weeks and make every
-                    line look calmer or wilder than it is depending on the
-                    refresh. Fixed domain, clipped outliers, stable week to week. */}
-                <YAxis domain={[0.35, 0.65]} allowDataOverflow
-                       ticks={[0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65]}
+                    30–70% matches the row sparklines so the two read the same
+                    way, and it is fixed rather than fitted: letting the axis
+                    follow the data would rescale every line around whichever
+                    thin week was most extreme that refresh. Outliers clip. */}
+                <YAxis domain={[0.30, 0.70]} allowDataOverflow
+                       ticks={[0.30, 0.40, 0.50, 0.60, 0.70]}
                        tickFormatter={(v) => `${Math.round(v * 100)}%`}
                        tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={52} />
                 <ReferenceLine y={0.5} stroke="#64748b" strokeDasharray="3 3" />
