@@ -19,6 +19,11 @@ import Sparkline from './Sparkline';
 const AXIS_LO = 0.40;
 const AXIS_HI = 0.60;
 
+// The header and the rows are laid out by the SAME template, declared once.
+// They were two separate flex rows with hand-matched widths, which drifted the
+// moment any cell changed: the headers sat over the wrong columns.
+const GRID = 'grid grid-cols-[minmax(0,9.5rem)_1fr_3.25rem_3.5rem_2.75rem_3.25rem_3.75rem_1.75rem] items-center gap-2';
+
 const pct = (v, dp = 1) => (v == null ? '—' : `${(v * 100).toFixed(dp)}%`);
 const posPct = (v) => `${(((Math.min(AXIS_HI, Math.max(AXIS_LO, v)) - AXIS_LO) / (AXIS_HI - AXIS_LO)) * 100).toFixed(2)}%`;
 
@@ -27,9 +32,7 @@ function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children }) {
   const c = wrColor(wr);
   return (
     <div
-      className={`grid grid-cols-[minmax(0,9.5rem)_1fr_auto] items-center gap-2 py-1 ${
-        onClick ? 'cursor-pointer hover:bg-slate-700/30 rounded' : ''
-      }`}
+      className={`${GRID} py-1 ${onClick ? 'cursor-pointer hover:bg-slate-700/30 rounded' : ''}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -57,10 +60,8 @@ function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children }) {
         )}
       </div>
 
-      <div className="flex items-center gap-2 justify-end">
-        <span className={`tabular-nums text-[12px] font-semibold w-12 text-right ${c.text}`}>{pct(wr)}</span>
-        {sub}
-      </div>
+      <span className={`tabular-nums text-[12px] font-semibold text-right ${c.text}`}>{pct(wr)}</span>
+      {sub}
     </div>
   );
 }
@@ -68,7 +69,7 @@ function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children }) {
 /** ▲ / ▼ / — for the 28-day vs prior-56-day test. */
 function MoveChip({ move }) {
   if (!move || !move.tested) {
-    return <span className="text-[10px] text-slate-600 w-12 text-right" title="Not enough games in one of the two windows to test for movement.">—</span>;
+    return <span className="text-[10px] text-slate-600 text-right" title="Not enough games in one of the two windows to test for movement.">—</span>;
   }
   const up = move.direction === 'up';
   const down = move.direction === 'down';
@@ -77,7 +78,7 @@ function MoveChip({ move }) {
     ? `Last 28 days vs the 56 before: ${move.delta > 0 ? '+' : ''}${(move.delta * 100).toFixed(1)} points (z=${move.z}). About 1 in 28 of these arrows is expected to be a false alarm.`
     : `No movement this test can resolve (z=${move.z}).`;
   return (
-    <span className={`text-[10px] tabular-nums w-12 text-right ${tone}`} title={title}>
+    <span className={`text-[10px] tabular-nums text-right ${tone}`} title={title}>
       {up ? '▲' : down ? '▼' : '·'} {move.delta != null ? `${move.delta > 0 ? '+' : ''}${(move.delta * 100).toFixed(1)}` : ''}
     </span>
   );
@@ -170,22 +171,19 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         Games won, counting a draw as half a win. Not adjusted for who was playing.
       </p>
 
-      <div className="grid grid-cols-[minmax(0,9.5rem)_1fr_auto] gap-2 text-[10px] uppercase tracking-wide text-slate-500 pb-1 border-b border-slate-700/70">
+      <div className={`${GRID} text-[10px] uppercase tracking-wide text-slate-500 pb-1 border-b border-slate-700/70`}>
         <div>Faction</div>
         <div className="hidden sm:flex justify-between"><span>{pct(AXIS_LO, 0)}</span><span>50%</span><span>{pct(AXIS_HI, 0)}</span></div>
-        <div className="flex items-center gap-2 justify-end">
-          <span className="w-12 text-right">All time</span>
-          <span className="w-[52px] text-right">By week</span>
-          <span className="w-8 text-right" title="Win rate over the last 7 days of games. One weekend is a small sample, so expect it to jump around.">Last 7d</span>
-          <span className="w-8 text-right"
-                title={meta?.dataslateFrom
-                  ? `Win rate since the points update on ${meta.dataslateFrom}. It is a date range, not a claim about what the update did.`
-                  : 'Since the last points update'}>
-            {meta?.dataslateFrom ? `Since ${new Date(meta.dataslateFrom + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : 'Since update'}
-          </span>
-          <span className="w-12 text-right" title="The last 28 days compared with the 56 days before them.">28d vs prev</span>
-          <span className="w-3" />
+        <div className="text-right" title="Every 11th edition game in the data — the site holds no games from before the edition launched.">11th ed</div>
+        <div className="text-right">By week</div>
+        <div className="text-right" title="Win rate over the last 7 days of games. One weekend is a small sample, so expect it to jump around.">Last 7d</div>
+        <div className="text-right" title={meta?.dataslateFrom
+              ? `Win rate since the points update on ${meta.dataslateFrom}. It is a date range, not a claim about what the update did.`
+              : 'Since the last points update'}>
+          {meta?.dataslateFrom ? `Since ${new Date(meta.dataslateFrom + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : 'Since update'}
         </div>
+        <div className="text-right" title="The last 28 days compared with the 56 days before them.">28d vs prev</div>
+        <div />
       </div>
 
       <div className="divide-y divide-slate-700/40">
@@ -203,19 +201,20 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
                 onClick={() => setExpanded(isOpen ? null : r.faction)}
                 sub={
                   <>
-                    <Sparkline data={r.series} accent={wrColor(r.wr).hex} width={52} height={14} />
-                    <span className="w-8 text-right"><Snapshot w={r.lastWeek} label="Last 7 days" /></span>
-                    <span className="w-8 text-right"><Snapshot w={r.sinceDataslate} label={`Since ${meta?.dataslateFrom || 'the last points update'}`} /></span>
+                    <span className="flex justify-end"><Sparkline data={r.series} accent={wrColor(r.wr).hex} width={52} height={14} /></span>
+                    <span className="text-right"><Snapshot w={r.lastWeek} label="Last 7 days" /></span>
+                    <span className="text-right"><Snapshot w={r.sinceDataslate} label={`Since ${meta?.dataslateFrom || 'the last points update'}`} /></span>
                     <MoveChip move={r.move} />
+                    {/* One big chevron that turns to point down when the row is
+                        open. The count-in-a-box version read as data rather
+                        than as a control. */}
                     <span
-                      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] border transition-colors ${
-                        isOpen
-                          ? 'border-purple-500/60 bg-purple-500/15 text-purple-200'
-                          : 'border-slate-600/60 text-slate-400 group-hover:border-purple-500/60 group-hover:text-purple-200'
+                      className={`justify-self-end text-[15px] leading-none transition-transform duration-150 ${
+                        isOpen ? 'rotate-90 text-purple-300' : 'text-slate-500 group-hover:text-purple-300'
                       }`}
-                      title={`${detCount} detachment${detCount === 1 ? '' : 's'} — click the row to ${isOpen ? 'hide' : 'show'} them`}
+                      title={`${detCount} detachment${detCount === 1 ? '' : 's'} — click to ${isOpen ? 'hide' : 'show'} them`}
                     >
-                      {detCount || ''}<span className="text-[9px]">{isOpen ? '▾' : '▸'}</span>
+                      ›
                     </span>
                   </>
                 }
