@@ -139,7 +139,6 @@ function topPlaystyles(profile, n = 2) {
     .map(([key, val]) => ({ key, val, archetype: archetypes[key] }));
 }
 
-const LAST_FACTION_KEY = 'nachmund.lastFaction';
 
 // A single off-meta winning list (a winning list that doesn't belong to any
 // shown build). Renders record + provenance + the parsed list, mirroring the
@@ -265,26 +264,16 @@ const FactionView = () => {
   const [searchParams] = useSearchParams();
 
   // Hydrate from URL params first (search palette, deep link, share),
-  // then localStorage (returning users land on what they actually
-  // play), finally falling back to the first faction.
+  // and nothing else. A faction is selected when the reader selects one — a
+  // remembered choice from a previous visit is not a choice made now, and
+  // restoring it put a wall of faction detail under the picker before anyone
+  // had asked for it. The page opens on the overview and ends at the picker
+  // until something is actually picked. A shared link still lands where it
+  // points, because that IS a choice, made by whoever sent it.
   const [selectedFaction, setSelectedFaction] = useState(() => {
     const fromUrl = searchParams.get('faction');
-    if (fromUrl && factions.includes(fromUrl)) return fromUrl;
-    try {
-      const saved = window.localStorage?.getItem(LAST_FACTION_KEY);
-      if (saved && factions.includes(saved)) return saved;
-    } catch { /* localStorage unavailable, e.g. SSR or strict privacy mode */ }
-    // Nothing selected on a first visit. The overview above answers "how is
-    // every faction doing" without a choice being made first; picking one is
-    // the second step, not the price of admission. A returning visitor still
-    // lands on their own faction via localStorage above.
-    return null;
+    return fromUrl && factions.includes(fromUrl) ? fromUrl : null;
   });
-  // Persist on change so the next visit hydrates with it.
-  useEffect(() => {
-    if (!selectedFaction) return;   // never persist the empty first-visit state
-    try { window.localStorage?.setItem(LAST_FACTION_KEY, selectedFaction); } catch { /* noop */ }
-  }, [selectedFaction]);
   const [selectedBuild, setSelectedBuild] = useState(() => {
     const b = searchParams.get('build');
     return b != null && b !== '' ? Number(b) : null;
@@ -550,11 +539,6 @@ const FactionView = () => {
             visit the overview above has already answered the general question,
             so the page simply ends rather than guessing a faction for the
             reader. */}
-        {!selectedFaction && (
-          <p className="text-center text-slate-500 text-sm">
-            Pick a faction above for its builds, the lists that won with them, and every detachment.
-          </p>
-        )}
         {selectedFaction && (<>
 
         <h2 className="text-3xl font-bold text-white text-center mb-6">{displayFactionName(selectedFaction)}</h2>

@@ -252,7 +252,7 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
           </p>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={timeData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+              <LineChart data={timeData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
                 <XAxis dataKey="bucket" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
                 {/* A wider band than the summary rows above: a single week's
                     win rate swings far more than a faction's season figure.
@@ -261,8 +261,10 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
                     rescale itself around a handful of thin weeks and make every
                     line look calmer or wilder than it is depending on the
                     refresh. Fixed domain, clipped outliers, stable week to week. */}
-                <YAxis domain={[0.35, 0.65]} allowDataOverflow tickFormatter={(v) => `${Math.round(v * 100)}%`}
-                       tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={44} />
+                <YAxis domain={[0.35, 0.65]} allowDataOverflow
+                       ticks={[0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65]}
+                       tickFormatter={(v) => `${Math.round(v * 100)}%`}
+                       tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={52} />
                 <ReferenceLine y={0.5} stroke="#64748b" strokeDasharray="3 3" />
                 <Tooltip
                   contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 6, fontSize: 11 }}
