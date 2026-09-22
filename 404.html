@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Nachmund</title>
+    <!--
+      GitHub Pages serves this for any path it has no file for, which on a
+      client-side-routed app is every route except the root. Before this file
+      existed, /docs returned a hard 404 — so any link to it, shared anywhere,
+      was dead for everyone who clicked it.
+
+      The redirect preserves the requested path in the query string; the app
+      reads it back on boot (see the companion snippet in index.html's body)
+      and restores the real URL with history.replaceState, so the visitor lands
+      where they meant to and the address bar ends up correct.
+
+      No JS, no route: the <noscript> link still gets the reader to the site.
+    -->
+    <script>
+      (function () {
+        var base = '/40k-archetype-viewer/';
+        var path = window.location.pathname;
+        var rest = path.indexOf(base) === 0 ? path.slice(base.length) : '';
+        window.location.replace(
+          base + '?redirect=' + encodeURIComponent(rest + window.location.search + window.location.hash)
+        );
+      })();
+    </script>
+  </head>
+  <body style="background:#0f172a;color:#cbd5e1;font-family:system-ui,sans-serif;padding:3rem;text-align:center">
+    <p>Taking you to Nachmund…</p>
+    <noscript>
+      <p><a href="/40k-archetype-viewer/" style="color:#c4b5fd">Continue to Nachmund</a></p>
+    </noscript>
+  </body>
+</html>

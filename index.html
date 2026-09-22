@@ -5,7 +5,27 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
-    <meta name="description" content="Nachmund — Warhammer 40K (10th edition) tournament meta analysis. Faction archetype radars, build clusters, matchup explorer, and predictor." />
+    <!-- SHARED-LINK CARD. Discord, Slack and the rest read these tags from the
+         SERVED HTML and never run JavaScript, so nothing React renders can
+         appear in an unfurl — the tags have to be here, static, with absolute
+         URLs (a relative og:image silently produces a card with no picture).
+         The numbers and the ?v= stamp are rewritten from the artifact's own
+         metadata by the refresh, because a hand-typed count goes stale the
+         week after it is written: this description said "10th edition ...
+         archetype radars, matchup explorer, and predictor" while the site ran
+         11th edition with all three of those surfaces switched off. -->
+    <meta name="description" content="Nachmund — Warhammer 40K 11th edition tournament meta analysis. Faction win rates and the builds people are actually running." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Nachmund" />
+    <meta property="og:url" content="https://jstewart0788.github.io/40k-archetype-viewer/" />
+    <meta property="og:title" content="Nachmund — 40K 11th Edition Faction Win Rates" />
+    <meta property="og:description" content="Skill-adjusted tournament win rates for every 11th edition faction." />
+    <meta property="og:image" content="https://jstewart0788.github.io/40k-archetype-viewer/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="Win rate by faction, 11th edition tournament data" />
+    <meta name="twitter:card" content="summary_large_image" />
     <!-- Don't leak the user's exact path to Google Fonts (or any cross-origin
          asset). Origin-only is enough for fonts to resolve correctly. -->
     <meta name="referrer" content="strict-origin-when-cross-origin" />
@@ -25,12 +45,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&display=swap" />
     <title>Nachmund</title>
-    <script type="module" crossorigin src="/40k-archetype-viewer/assets/index-BdWWppvF.js"></script>
-    <link rel="modulepreload" crossorigin href="/40k-archetype-viewer/assets/katex-B6-zOaUx.js">
+    <script type="module" crossorigin src="/40k-archetype-viewer/assets/index-CXDalKwy.js"></script>
+    <link rel="modulepreload" crossorigin href="/40k-archetype-viewer/assets/katex-BIXftYNr.js">
     <link rel="stylesheet" crossorigin href="/40k-archetype-viewer/assets/katex-BSDohvTu.css">
-    <link rel="stylesheet" crossorigin href="/40k-archetype-viewer/assets/index-D4Wr6_nV.css">
+    <link rel="stylesheet" crossorigin href="/40k-archetype-viewer/assets/index-BLoeLkei.css">
   </head>
   <body>
+    <!-- Restore a deep link that GitHub Pages bounced through 404.html. Runs
+         before the app boots so React Router sees the real path and the
+         address bar never shows the ?redirect= form. -->
+    <script>
+      (function () {
+        var m = /[?&]redirect=([^&]*)/.exec(window.location.search);
+        if (!m) return;
+        var target = decodeURIComponent(m[1] || '');
+        if (target.indexOf('//') === 0 || /^[a-z]+:/i.test(target)) return; // never off-site
+        window.history.replaceState(null, '', '/40k-archetype-viewer/' + target);
+      })();
+    </script>
     <div id="root">
       <!-- Static loading state. React replaces this once the bundle hydrates.
            Users on slow connections see something coherent in the 1-3s
