@@ -28,7 +28,7 @@ const pct = (v, dp = 1) => (v == null ? '—' : `${(v * 100).toFixed(dp)}%`);
 const posPct = (v) => `${(((Math.min(AXIS_HI, Math.max(AXIS_LO, v)) - AXIS_LO) / (AXIS_HI - AXIS_LO)) * 100).toFixed(2)}%`;
 
 /** One faction or detachment row: name, interval, dot, numbers. */
-function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children, muted, valueTitle }) {
+function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children, valueTitle }) {
   const c = wrColor(wr);
   return (
     <div
@@ -53,21 +53,15 @@ function Row({ label, wr, ciLo, ciHi, games, sub, dim, onClick, children, muted,
           />
         )}
         {wr != null && (
-          // Hollow when the dot is NOT last week's figure — a faction with too
-          // few games in the window still has a position worth seeing, but it
-          // must not read as the same measurement as the solid dots.
           <div
             className="absolute top-1/2 w-2.5 h-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full ring-2 ring-slate-800"
-            style={muted
-              ? { left: posPct(wr), backgroundColor: 'transparent', boxShadow: `inset 0 0 0 2px ${c.hex}` }
-              : { left: posPct(wr), backgroundColor: c.hex }}
+            style={{ left: posPct(wr), backgroundColor: c.hex }}
           />
         )}
       </div>
 
-      <span className={`tabular-nums text-[12px] font-semibold text-right ${muted ? 'text-slate-600' : c.text}`}
-            title={valueTitle}>
-        {muted ? '—' : pct(wr)}
+      <span className={`tabular-nums text-[12px] font-semibold text-right ${c.text}`} title={valueTitle}>
+        {pct(wr)}
       </span>
       {sub}
     </div>
@@ -95,14 +89,6 @@ function MoveChip({ move }) {
 /** A snapshot window: the number, or an honest blank when the sample is too thin. */
 function Snapshot({ w, label }) {
   if (!w) return <span className="text-slate-600 text-[11px] tabular-nums" title={`${label}: no games`}>—</span>;
-  if (w.belowFloor) {
-    return (
-      <span className="text-slate-600 text-[11px] tabular-nums"
-            title={`${label}: only ${w.n} games — the margin of error would be wider than the gap between the best and worst faction, so no figure is shown.`}>
-        —
-      </span>
-    );
-  }
   const c = wrColor(w.winRate);
   return (
     <span className={`text-[11px] tabular-nums ${c.text}`}
@@ -139,11 +125,11 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         // where it has been since the last points update (the band). The two
         // answer different questions and the row shows both at once — a dot
         // outside its own band is a faction whose week departed from its form.
-        const lw = t.lastWeek && !t.lastWeek.belowFloor ? t.lastWeek : null;
-        const ds = t.sinceDataslate && !t.sinceDataslate.belowFloor ? t.sinceDataslate : null;
+        const lw = t.lastWeek || null;
+        const ds = t.sinceDataslate || null;
         const wr = lw ? lw.winRate : (ds ? ds.winRate : edition);
         return {
-          faction, wr, games, edition, hasWeek: !!lw,
+          faction, wr, games, edition,
           // Band: the spread the dataslate window supports, so the dot is read
           // against this edition's current rules rather than the whole corpus.
           ciLo: ds ? ds.ciLo : null,
@@ -158,8 +144,8 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
       // what is winning NOW. Factions whose week is too thin to report sort to
       // the bottom rather than being ranked on a number that is not shown.
       .sort((a, b) => {
-        const av = a.lastWeek && !a.lastWeek.belowFloor ? a.lastWeek.winRate : -1;
-        const bv = b.lastWeek && !b.lastWeek.belowFloor ? b.lastWeek.winRate : -1;
+        const av = a.lastWeek ? a.lastWeek.winRate : -1;
+        const bv = b.lastWeek ? b.lastWeek.winRate : -1;
         if (av !== bv) return bv - av;
         return (b.edition ?? 0) - (a.edition ?? 0);
       });
@@ -228,10 +214,9 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
               <Row
                 label={r.faction}
                 wr={r.wr} ciLo={r.ciLo} ciHi={r.ciHi} games={r.games}
-                muted={!r.hasWeek}
-                valueTitle={r.hasWeek
-                  ? `${(r.lastWeek.n || 0).toLocaleString()} games in the last 7 days`
-                  : `Too few games in the last 7 days to report (${r.lastWeek?.n ?? 0}). The hollow dot is this faction's rate since the last points update.`}
+                valueTitle={r.lastWeek
+                  ? `${(r.lastWeek.n || 0).toLocaleString()} games in the last 7 days · ${pct(r.lastWeek.ciLo)}–${pct(r.lastWeek.ciHi)}`
+                  : 'No games in the last 7 days'}
                 onClick={() => setActive(isOpen ? null : r.faction)}
                 sub={
                   <>
@@ -298,8 +283,8 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
 
       <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
         <strong className="text-slate-400">Last 7d</strong> is the most recent weekend of games —
-        a small sample, shown as a snapshot rather than a trend, and left blank when there are too
-        few games to mean anything.{' '}
+        a snapshot rather than a trend. Faction weeks run from about 20 games to 450, so hover a
+        figure to see how many it rests on.{' '}
         {meta?.dataslateFrom && (
           <>
             <strong className="text-slate-400">
