@@ -181,8 +181,9 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
         {rows.map((r) => {
           const isOpen = expanded === r.faction;
           const dets = (detachmentViews?.[r.faction] || []).slice().sort((a, b) => (b.nGames || 0) - (a.nGames || 0));
+          const detCount = dets.length;
           return (
-            <div key={r.faction}
+            <div key={r.faction} className="group"
                  onMouseEnter={() => setHovered(r.faction)}
                  onMouseLeave={() => setHovered(null)}>
               <Row
@@ -195,7 +196,16 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
                     <span className="w-8 text-right"><Snapshot w={r.lastWeek} label="Last 7 days" /></span>
                     <span className="w-8 text-right"><Snapshot w={r.sinceDataslate} label={`Since ${meta?.dataslateFrom || 'the last points update'}`} /></span>
                     <MoveChip move={r.move} />
-                    <span className="text-slate-600 text-[10px] w-3 text-center">{isOpen ? '▾' : '▸'}</span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] border transition-colors ${
+                        isOpen
+                          ? 'border-purple-500/60 bg-purple-500/15 text-purple-200'
+                          : 'border-slate-600/60 text-slate-400 group-hover:border-purple-500/60 group-hover:text-purple-200'
+                      }`}
+                      title={`${detCount} detachment${detCount === 1 ? '' : 's'} — click the row to ${isOpen ? 'hide' : 'show'} them`}
+                    >
+                      {detCount || ''}<span className="text-[9px]">{isOpen ? '▾' : '▸'}</span>
+                    </span>
                   </>
                 }
               />
@@ -266,12 +276,24 @@ export default function FactionOverview({ factionRatings, factionTrends, detachm
                        tickFormatter={(v) => `${Math.round(v * 100)}%`}
                        tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={52} />
                 <ReferenceLine y={0.5} stroke="#64748b" strokeDasharray="3 3" />
+                {/* Only the faction in focus. The default tooltip lists every
+                    series, which here is 28 rows — a panel tall enough to cover
+                    the faction picker underneath the chart. */}
                 <Tooltip
-                  contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 6, fontSize: 11 }}
-                  labelStyle={{ color: '#e2e8f0' }}
-                  formatter={(value, name) => [`${(value * 100).toFixed(1)}%`, name]}
-                  filterNull
-                  itemSorter={(it) => -it.value}
+                  cursor={{ stroke: '#475569', strokeWidth: 1 }}
+                  wrapperStyle={{ pointerEvents: 'none', zIndex: 30 }}
+                  content={({ active, payload, label }) => {
+                    if (!active || !focus) return null;
+                    const hit = (payload || []).find((p) => p.dataKey === focus);
+                    if (!hit || hit.value == null) return null;
+                    return (
+                      <div style={{ background: '#0f172a', border: '1px solid #334155',
+                                    borderRadius: 6, fontSize: 11, padding: '4px 8px', color: '#e2e8f0' }}>
+                        <span style={{ color: '#94a3b8' }}>{label} · </span>
+                        {focus} <strong>{(hit.value * 100).toFixed(1)}%</strong>
+                      </div>
+                    );
+                  }}
                 />
                 {rows.map((r) => {
                   const isFocus = focus === r.faction;

@@ -274,6 +274,41 @@ const FactionView = () => {
     const fromUrl = searchParams.get('faction');
     return fromUrl && factions.includes(fromUrl) ? fromUrl : null;
   });
+  // "Full breakdown" jumps to the faction detail, which renders below the
+  // picker — a screen and a half down. Driven from the click, NOT from a
+  // useEffect on the selection: asking for the breakdown of the faction that is
+  // already selected changes no state, so an effect would not fire and the
+  // button would do nothing at all.
+  //
+  // Selecting a faction mounts the heading, the win-rate panel and every build
+  // card, and the page keeps growing for a few frames after. A single scroll
+  // fired into that lands wherever the layout happened to be mid-mount, so
+  // re-aim a few times and stop once the heading is near the top.
+  const scrollToDetail = () => {
+    // Poll rather than guess at a delay. The detail block is mounted by the
+    // same click, and how long that takes depends on the faction — Space
+    // Marines renders 28 build cards, Deathwatch three. Fixed timeouts either
+    // fired before the element existed or after the page had finished growing
+    // and moved it again.
+    // Timers, not requestAnimationFrame: rAF is paused while a tab is in the
+    // background, so the jump silently did nothing for anyone who opened the
+    // site in a background tab and came back to it.
+    const deadline = Date.now() + 3000;
+    const tick = () => {
+      const el = document.getElementById('faction-detail');
+      if (el) {
+        const top = el.getBoundingClientRect().top;
+        if (Math.abs(top - 80) < 24) return;               // landed
+        // Instant, not smooth: a smooth scroll is dropped outright while the
+        // tab is in the background, and it also fights the poll below — each
+        // re-aim would restart an animation that the next tick interrupts.
+        window.scrollTo({ top: window.scrollY + top - 80 });
+      }
+      if (Date.now() < deadline) setTimeout(tick, 100);
+    };
+    tick();
+  };
+
   const [selectedBuild, setSelectedBuild] = useState(() => {
     const b = searchParams.get('build');
     return b != null && b !== '' ? Number(b) : null;
@@ -488,7 +523,10 @@ const FactionView = () => {
             factionTrends={factionTrends}
             detachmentViews={detachmentViews}
             dataMetadata={dataMetadata}
-            onSelectFaction={(f) => { setSelectedFaction(f); setSelectedBuild(null); setBuildTab('description'); }}
+            onSelectFaction={(f) => {
+              setSelectedFaction(f); setSelectedBuild(null); setBuildTab('description');
+              scrollToDetail();
+            }}
           />
 
           {/* Faction picker — wrap-grid on tablet+, native <select> on phone */}
@@ -541,7 +579,7 @@ const FactionView = () => {
             reader. */}
         {selectedFaction && (<>
 
-        <h2 className="text-3xl font-bold text-white text-center mb-6">{displayFactionName(selectedFaction)}</h2>
+        <h2 id="faction-detail" className="text-3xl font-bold text-white text-center mb-6 scroll-mt-20">{displayFactionName(selectedFaction)}</h2>
 
         {/* Headline (list-composition flags + playstyle archetype ratings) —
             hidden in early-edition mode; see src/featureFlags.js */}
